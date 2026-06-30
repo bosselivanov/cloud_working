@@ -1,0 +1,354 @@
+:root {
+  --bg: #f8f7f2;
+  --panel: rgba(255, 255, 255, 0.84);
+  --panel-border: rgba(24, 24, 27, 0.08);
+  --ink: #171717;
+  --muted: #626262;
+  --accent: #0d6b56;
+  --accent-soft: rgba(13, 107, 86, 0.12);
+  --accent-line: rgba(13, 107, 86, 0.3);
+  --shadow: 0 20px 60px rgba(18, 20, 27, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  font-family: "Segoe UI Variable Display", "Trebuchet MS", "Segoe UI", sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.95), rgba(248, 247, 242, 0.88)),
+    var(--bg);
+}
+
+body {
+  overflow: hidden;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  height: 100vh;
+}
+
+.side-panel {
+  padding: 28px;
+  border-right: 1px solid var(--panel-border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(250, 248, 241, 0.95));
+  backdrop-filter: blur(22px);
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.6);
+  overflow: auto;
+}
+
+.brand h1,
+.workspace-topbar h2 {
+  margin: 0;
+  line-height: 0.95;
+}
+
+.brand h1 {
+  font-size: clamp(2.4rem, 5vw, 3.8rem);
+  letter-spacing: -0.06em;
+}
+
+.workspace-topbar h2 {
+  font-size: clamp(1.7rem, 3vw, 2.4rem);
+  letter-spacing: -0.05em;
+  max-width: 560px;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.lead {
+  margin: 16px 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.panel-block {
+  margin-top: 28px;
+  padding: 18px;
+  border: 1px solid rgba(24, 24, 27, 0.07);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: var(--shadow);
+}
+
+.panel-block h2 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+}
+
+.hint-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.primary-button,
+.ghost-button,
+.mini-button,
+.chip-button {
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 160ms ease, background 160ms ease, opacity 160ms ease;
+}
+
+.primary-button,
+.ghost-button {
+  width: 100%;
+  padding: 14px 16px;
+}
+
+.primary-button {
+  background: var(--ink);
+  color: white;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.14);
+}
+
+.ghost-button {
+  margin-top: 10px;
+  background: rgba(23, 23, 23, 0.06);
+  color: var(--ink);
+}
+
+.ghost-button.muted:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.primary-button:hover,
+.ghost-button:hover,
+.mini-button:hover,
+.chip-button:hover {
+  transform: translateY(-1px);
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(23, 23, 23, 0.06);
+  color: var(--muted);
+}
+
+.status-pill.active {
+  background: rgba(13, 107, 86, 0.14);
+  color: var(--accent);
+}
+
+.workspace {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-width: 0;
+}
+
+.workspace-topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 28px 32px 18px;
+  align-items: end;
+}
+
+.topbar-meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: var(--muted);
+}
+
+.topbar-meta span {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(24, 24, 27, 0.06);
+}
+
+.board-viewport {
+  position: relative;
+  overflow: hidden;
+  margin: 0 24px 24px;
+  border-radius: 32px;
+  background:
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.85), rgba(248, 247, 242, 0.74)),
+    radial-gradient(circle, rgba(23, 23, 23, 0.16) 1px, transparent 1.5px);
+  background-size: auto, 22px 22px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), var(--shadow);
+}
+
+.board {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+}
+
+.connections-layer,
+.cloud-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.connections-layer {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.connection {
+  fill: none;
+  stroke: var(--accent-line);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.connection.pending {
+  stroke-dasharray: 10 12;
+}
+
+.cloud-card {
+  position: absolute;
+  min-width: 260px;
+  max-width: 420px;
+  padding: 20px;
+  border-radius: 34px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 2px solid rgba(23, 23, 23, 0.12);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(16px);
+}
+
+.cloud-card.selected,
+.task-chip.selected {
+  outline: 3px solid rgba(13, 107, 86, 0.18);
+  outline-offset: 4px;
+}
+
+.cloud-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.cloud-title {
+  margin: 0;
+  font-size: 2.1rem;
+  letter-spacing: -0.06em;
+}
+
+.cloud-meta {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.cloud-actions,
+.task-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.mini-button,
+.chip-button {
+  padding: 10px 12px;
+  background: rgba(23, 23, 23, 0.07);
+  color: var(--ink);
+}
+
+.task-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.task-chip {
+  padding: 14px;
+  border-radius: 22px;
+  background: rgba(245, 244, 238, 0.95);
+  border: 1px solid rgba(23, 23, 23, 0.07);
+}
+
+.task-main {
+  display: grid;
+  gap: 10px;
+}
+
+.task-title {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.deadline-input {
+  width: fit-content;
+  padding: 8px 10px;
+  border: 1px solid rgba(23, 23, 23, 0.08);
+  border-radius: 12px;
+  background: white;
+}
+
+.editable {
+  outline: none;
+}
+
+.editable:focus {
+  box-shadow: inset 0 -2px 0 rgba(13, 107, 86, 0.24);
+}
+
+.entity[data-link-target="true"] {
+  box-shadow: 0 0 0 3px rgba(13, 107, 86, 0.14), var(--shadow);
+}
+
+@media (max-width: 980px) {
+  body {
+    overflow: auto;
+  }
+
+  .app-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .side-panel {
+    border-right: 0;
+    border-bottom: 1px solid var(--panel-border);
+  }
+
+  .workspace {
+    min-height: 70vh;
+  }
+
+  .workspace-topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .board-viewport {
+    min-height: 78vh;
+    margin-top: 0;
+  }
+}
