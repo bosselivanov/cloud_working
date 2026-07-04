@@ -28,6 +28,7 @@ let cloudDrag = null;
 let taskDrag = null;
 let panSession = null;
 let spacePressed = false;
+let suppressCloudClickUntil = 0;
 
 bootstrap();
 
@@ -185,11 +186,15 @@ function renderClouds() {
         originX: cloud.x,
         originY: cloud.y,
         node,
+        moved: false,
       };
       node.setPointerCapture(event.pointerId);
     });
 
     node.addEventListener("click", () => {
+      if (Date.now() < suppressCloudClickUntil) {
+        return;
+      }
       openCloud(cloud.id);
     });
 
@@ -233,6 +238,7 @@ function renderStudio() {
         originX: task.x,
         originY: task.y,
         node: taskNode,
+        moved: false,
       };
       taskNode.setPointerCapture(event.pointerId);
     });
@@ -350,8 +356,13 @@ function handleZoom(event) {
 }
 
 function handlePanStart(event) {
-  const isViewport = event.target === elements.viewport;
-  if (!spacePressed || !isViewport || state.openCloudId) {
+  const insideViewport = Boolean(event.target.closest("#boardViewport"));
+  const overCloud = Boolean(event.target.closest(".cloud-node"));
+  if (state.openCloudId || !insideViewport) {
+    return;
+  }
+
+  if (!spacePressed && overCloud) {
     return;
   }
 
@@ -381,8 +392,14 @@ function handlePointerMove(event) {
       return;
     }
 
-    cloud.x = cloudDrag.originX + (event.clientX - cloudDrag.startX) / state.view.scale;
-    cloud.y = cloudDrag.originY + (event.clientY - cloudDrag.startY) / state.view.scale;
+    const deltaX = event.clientX - cloudDrag.startX;
+    const deltaY = event.clientY - cloudDrag.startY;
+    if (!cloudDrag.moved && Math.hypot(deltaX, deltaY) > 6) {
+      cloudDrag.moved = true;
+    }
+
+    cloud.x = cloudDrag.originX + deltaX / state.view.scale;
+    cloud.y = cloudDrag.originY + deltaY / state.view.scale;
     cloudDrag.node.style.left = `${cloud.x}px`;
     cloudDrag.node.style.top = `${cloud.y}px`;
     return;
@@ -400,8 +417,13 @@ function handlePointerMove(event) {
     }
 
     const canvasRect = elements.taskCanvas.getBoundingClientRect();
-    task.x = clamp(taskDrag.originX + (event.clientX - taskDrag.startX), 14, Math.max(14, canvasRect.width - 254));
-    task.y = clamp(taskDrag.originY + (event.clientY - taskDrag.startY), 14, Math.max(14, canvasRect.height - 170));
+    const deltaX = event.clientX - taskDrag.startX;
+    const deltaY = event.clientY - taskDrag.startY;
+    if (!taskDrag.moved && Math.hypot(deltaX, deltaY) > 4) {
+      taskDrag.moved = true;
+    }
+    task.x = clamp(taskDrag.originX + deltaX, 14, Math.max(14, canvasRect.width - 254));
+    task.y = clamp(taskDrag.originY + deltaY, 14, Math.max(14, canvasRect.height - 170));
     taskDrag.node.style.left = `${task.x}px`;
     taskDrag.node.style.top = `${task.y}px`;
     renderTaskEdges(cloud);
@@ -416,6 +438,10 @@ function handlePointerMove(event) {
 }
 
 function handlePointerUp() {
+  if (cloudDrag?.moved) {
+    suppressCloudClickUntil = Date.now() + 220;
+  }
+
   if (cloudDrag || taskDrag) {
     saveState();
   }
