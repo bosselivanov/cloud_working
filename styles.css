@@ -159,8 +159,8 @@ textarea {
   inset: 0;
   display: grid;
   grid-template-rows: auto auto 1fr;
-  gap: 16px;
-  padding: 22px 26px 20px;
+  gap: 18px;
+  padding: 34px 34px 26px;
   pointer-events: auto;
   overflow: visible;
 }
@@ -168,8 +168,8 @@ textarea {
 .cloud-studio-panel::before {
   content: "";
   position: absolute;
-  inset: 1.2vh 1vw;
-  border-radius: 44% 56% 40% 60% / 34% 36% 64% 66%;
+  inset: 1.5vh 1.2vw;
+  border-radius: 44px;
   border: 1px solid rgba(184, 146, 69, 0.16);
   background:
     radial-gradient(circle at top left, rgba(255, 255, 255, 0.86), transparent 32%),
@@ -183,9 +183,10 @@ textarea {
 .studio-header {
   display: flex;
   justify-content: space-between;
-  gap: 20px;
+  gap: 24px;
   align-items: flex-start;
   min-width: 0;
+  padding-top: 8px;
 }
 
 .studio-kicker {
@@ -198,11 +199,12 @@ textarea {
 
 .studio-title {
   margin: 0;
-  font-size: clamp(2.1rem, 4.2vw, 4rem);
+  font-size: clamp(2.4rem, 4.4vw, 4.6rem);
   letter-spacing: -0.07em;
-  line-height: 0.98;
+  line-height: 1.02;
   max-width: 100%;
-  word-break: break-word;
+  word-break: normal;
+  overflow-wrap: anywhere;
 }
 
 .editable {
@@ -222,7 +224,7 @@ textarea {
 
 .studio-title-wrap {
   min-width: 0;
-  max-width: min(860px, 64vw);
+  max-width: min(1100px, 72vw);
 }
 
 .studio-actions {
@@ -248,7 +250,7 @@ textarea {
   position: relative;
   overflow: hidden;
   min-height: 0;
-  border-radius: 38% 62% 46% 54% / 38% 40% 60% 62%;
+  border-radius: 40px;
   border: 1px solid rgba(184, 146, 69, 0.14);
   background:
     radial-gradient(circle at 24% 18%, rgba(255, 255, 255, 0.84), transparent 26%),
@@ -351,7 +353,7 @@ textarea {
 
 @media (max-width: 980px) {
   .cloud-studio-panel {
-    padding: 16px;
+    padding: 20px 16px 16px;
   }
 
   .studio-header {
