@@ -1,4 +1,4 @@
-﻿const STORAGE_KEY = "cloud-graph-state-v4";
+﻿const STORAGE_KEY = "cloud-graph-state-v5";
 
 const state = {
   view: { x: 0, y: 0, scale: 1 },
@@ -612,3 +612,4 @@ function saveState() {
     })
   );
 }
+
