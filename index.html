@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
@@ -7,84 +7,52 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="side-panel">
-      <div class="brand">
-        <p class="eyebrow">Graph Thinking</p>
-        <h1>Cloud Graph</h1>
-        <p class="lead">
-          Свободное полотно для идей, задач и логических связей между ними.
-        </p>
-      </div>
-
-      <div class="panel-block">
-        <button id="createCloudBtn" class="primary-button">Создать облако</button>
-        <button id="centerViewBtn" class="ghost-button">Сбросить вид</button>
-      </div>
-
-      <div class="panel-block">
-        <h2>Как работать</h2>
-        <ul class="hint-list">
-          <li>Тяни облака мышкой, чтобы раскладывать карту.</li>
-          <li>Добавляй задачи внутри облака через кнопку `+ задача`.</li>
-          <li>Нажми `Связать`, затем выбери вторую сущность.</li>
-          <li>Двойной клик по названию позволяет редактировать текст.</li>
-        </ul>
-      </div>
-
-      <div class="panel-block">
-        <h2>Режим связи</h2>
-        <div id="linkModeStatus" class="status-pill">Не активен</div>
-        <button id="cancelLinkBtn" class="ghost-button muted" disabled>Отменить связь</button>
-      </div>
-    </aside>
-
-    <main class="workspace">
-      <div class="workspace-topbar">
-        <div>
-          <p class="eyebrow">Концепт-поверхность</p>
-          <h2>Связи, как в mind map, но с блоками и задачами</h2>
-        </div>
-        <div class="topbar-meta">
-          <span>Колесо: масштаб</span>
-          <span>Пробел + drag: панорама</span>
-        </div>
-      </div>
-
-      <div id="boardViewport" class="board-viewport">
-        <div id="board" class="board">
-          <svg id="connectionsLayer" class="connections-layer"></svg>
-          <div id="cloudLayer" class="cloud-layer"></div>
-        </div>
-      </div>
-    </main>
+  <div id="boardViewport" class="board-viewport">
+    <div id="board" class="board">
+      <svg id="connectionsLayer" class="connections-layer"></svg>
+      <div id="cloudLayer" class="cloud-layer"></div>
+    </div>
   </div>
 
+  <div class="floating-dock" aria-label="Инструменты">
+    <button id="createCloudBtn" class="dock-button dock-button-primary" title="Создать облако">+ Облако</button>
+    <button id="centerViewBtn" class="dock-button" title="Сбросить вид">Центр</button>
+    <button id="cancelLinkBtn" class="dock-button" title="Отменить связь" disabled>Отмена связи</button>
+  </div>
+
+  <div id="linkModeStatus" class="link-status" aria-live="polite">Режим обзора</div>
+
   <template id="cloudTemplate">
-    <section class="cloud-card entity" data-type="cloud">
-      <div class="cloud-header">
+    <section class="cloud-node entity" data-type="cloud">
+      <div class="cloud-aurora"></div>
+      <div class="cloud-core">
         <div class="cloud-title-wrap">
-          <h3 class="editable cloud-title" contenteditable="true" spellcheck="false"></h3>
-          <p class="cloud-meta">Облако идей</p>
+          <h2 class="editable cloud-title" contenteditable="true" spellcheck="false"></h2>
         </div>
-        <div class="cloud-actions">
-          <button class="mini-button add-task-btn">+ задача</button>
-          <button class="mini-button link-btn">Связать</button>
+        <div class="cloud-favorites"></div>
+        <div class="cloud-details">
+          <div class="cloud-tools">
+            <button class="tool-button add-task-btn">+ задача</button>
+            <button class="tool-button link-btn">связать</button>
+          </div>
+          <div class="task-list"></div>
         </div>
       </div>
-      <div class="task-list"></div>
     </section>
   </template>
 
   <template id="taskTemplate">
-    <article class="task-chip entity" data-type="task">
-      <div class="task-main">
+    <article class="task-row entity" data-type="task">
+      <div class="task-row-main">
         <p class="editable task-title" contenteditable="true" spellcheck="false"></p>
-        <input class="deadline-input" type="date" aria-label="Дедлайн задачи">
+        <div class="task-meta">
+          <input class="deadline-input" type="date" aria-label="Дедлайн задачи">
+        </div>
       </div>
-      <div class="task-actions">
-        <button class="chip-button link-btn">Связать</button>
-        <button class="chip-button remove-btn">Удалить</button>
+      <div class="task-row-actions">
+        <button class="task-action favorite-btn" title="Избранное">☆</button>
+        <button class="task-action link-btn" title="Связать">⟲</button>
+        <button class="task-action remove-btn" title="Удалить">×</button>
       </div>
     </article>
   </template>

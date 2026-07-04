@@ -1,10 +1,11 @@
-const STORAGE_KEY = "cloud-graph-state-v1";
+﻿const STORAGE_KEY = "cloud-graph-state-v2";
 
 const state = {
   view: { x: 0, y: 0, scale: 1 },
   clouds: [],
   links: [],
   selectedEntityId: null,
+  selectedCloudId: null,
   linkStartId: null,
 };
 
@@ -17,8 +18,8 @@ const elements = {
   taskTemplate: document.getElementById("taskTemplate"),
   createCloudBtn: document.getElementById("createCloudBtn"),
   centerViewBtn: document.getElementById("centerViewBtn"),
-  linkModeStatus: document.getElementById("linkModeStatus"),
   cancelLinkBtn: document.getElementById("cancelLinkBtn"),
+  linkModeStatus: document.getElementById("linkModeStatus"),
 };
 
 let dragSession = null;
@@ -39,56 +40,77 @@ function bootstrap() {
 
 function seedDemo() {
   state.clouds = [
-    {
-      id: crypto.randomUUID(),
+    createCloudModel({
       title: "Экономика",
-      x: 120,
+      x: 160,
       y: 160,
       width: 420,
       tasks: [
-        createTask("Учебник", "2026-07-06"),
-        createTask("Связь с «Книги»", "2026-07-09"),
-        createTask("Решать задачи", "2026-07-12"),
+        createTask("Учебник", "2026-07-06", true),
+        createTask("Связь с Книги", "2026-07-09", false),
+        createTask("Решать задачи", "2026-07-12", true),
       ],
-    },
-    {
-      id: crypto.randomUUID(),
+      blobSeed: 0.12,
+    }),
+    createCloudModel({
       title: "Книги",
-      x: 840,
+      x: 860,
       y: 180,
-      width: 340,
-      tasks: [
-        createTask("Список литературы", "2026-07-03"),
-        createTask("Выделить главное", "2026-07-08"),
-      ],
-    },
-    {
-      id: crypto.randomUUID(),
-      title: "Учеба",
-      x: 320,
-      y: 610,
       width: 360,
       tasks: [
-        createTask("Смотреть вебинар", "2026-07-01"),
-        createTask("ЕГЭ", "2026-07-25"),
+        createTask("Список литературы", "2026-07-03", true),
+        createTask("Выделить главное", "2026-07-08", false),
       ],
-    },
+      blobSeed: 0.62,
+    }),
+    createCloudModel({
+      title: "Учеба",
+      x: 340,
+      y: 620,
+      width: 390,
+      tasks: [
+        createTask("Смотреть вебинар", "2026-07-01", false),
+        createTask("ЕГЭ", "2026-07-25", true),
+      ],
+      blobSeed: 0.84,
+    }),
   ];
 
   const [economics, books, study] = state.clouds;
   state.links = [
-    { id: crypto.randomUUID(), from: economics.id, to: books.id },
-    { id: crypto.randomUUID(), from: study.id, to: books.id },
-    { id: crypto.randomUUID(), from: economics.tasks[0].id, to: books.id },
-    { id: crypto.randomUUID(), from: study.tasks[1].id, to: economics.id },
+    createLinkModel(economics.id, books.id),
+    createLinkModel(study.id, books.id),
+    createLinkModel(economics.tasks[0].id, books.id),
+    createLinkModel(study.tasks[1].id, economics.id),
   ];
 }
 
-function createTask(title = "Новая задача", deadline = "") {
+function createCloudModel({ title, x, y, width = 360, tasks = [], blobSeed = Math.random() }) {
+  return {
+    id: crypto.randomUUID(),
+    title,
+    x,
+    y,
+    width,
+    blobSeed,
+    tasks,
+  };
+}
+
+function createTask(title = "Новая задача", deadline = "", favorite = false) {
   return {
     id: crypto.randomUUID(),
     title,
     deadline,
+    favorite,
+  };
+}
+
+function createLinkModel(from, to) {
+  return {
+    id: crypto.randomUUID(),
+    from,
+    to,
   };
 }
 
@@ -108,6 +130,7 @@ function bindGlobalEvents() {
 
   elements.viewport.addEventListener("wheel", handleZoom, { passive: false });
   elements.viewport.addEventListener("pointerdown", handlePanStart);
+  elements.viewport.addEventListener("dblclick", handleViewportDoubleClick);
   window.addEventListener("pointermove", handlePointerMove);
   window.addEventListener("pointerup", handlePointerUp);
   window.addEventListener("resize", renderConnections);
@@ -115,28 +138,44 @@ function bindGlobalEvents() {
   window.addEventListener("keydown", (event) => {
     if (event.code === "Space") {
       spacePressed = true;
-      elements.viewport.classList.add("panning");
+    }
+
+    if (event.key === "Escape") {
+      cancelLinkMode();
+      clearSelection();
     }
   });
 
   window.addEventListener("keyup", (event) => {
     if (event.code === "Space") {
       spacePressed = false;
-      elements.viewport.classList.remove("panning");
     }
   });
 }
 
-function createCloud() {
+function createCloud(x = 240 + state.clouds.length * 44, y = 180 + state.clouds.length * 44) {
   const nextIndex = state.clouds.length + 1;
-  state.clouds.push({
-    id: crypto.randomUUID(),
-    title: `Новое облако ${nextIndex}`,
-    x: 180 + nextIndex * 40,
-    y: 140 + nextIndex * 40,
-    width: 380,
+  const cloud = createCloudModel({
+    title: `Облако ${nextIndex}`,
+    x,
+    y,
+    width: 360,
     tasks: [createTask("Первая задача")],
   });
+  state.clouds.push(cloud);
+  state.selectedEntityId = cloud.id;
+  state.selectedCloudId = cloud.id;
+}
+
+function handleViewportDoubleClick(event) {
+  if (event.target !== elements.viewport) {
+    return;
+  }
+
+  const point = screenToWorld(event.clientX, event.clientY);
+  createCloud(point.x - 150, point.y - 70);
+  render();
+  saveState();
 }
 
 function render() {
@@ -145,15 +184,18 @@ function render() {
 
   for (const cloud of state.clouds) {
     const cloudNode = elements.cloudTemplate.content.firstElementChild.cloneNode(true);
+    const selectedCloud = state.selectedCloudId === cloud.id;
     cloudNode.dataset.entityId = cloud.id;
     cloudNode.style.left = `${cloud.x}px`;
     cloudNode.style.top = `${cloud.y}px`;
     cloudNode.style.width = `${cloud.width}px`;
-    cloudNode.querySelector(".cloud-title").textContent = cloud.title;
-    cloudNode.classList.toggle("selected", state.selectedEntityId === cloud.id);
+    cloudNode.style.setProperty("--blob-radius", getBlobRadius(cloud.blobSeed));
+    cloudNode.style.setProperty("--blob-tilt", `${getBlobTilt(cloud.blobSeed)}deg`);
+    cloudNode.classList.toggle("selected", selectedCloud);
     cloudNode.dataset.linkTarget = state.linkStartId && state.linkStartId !== cloud.id ? "true" : "false";
 
-    setupCloudEvents(cloudNode, cloud);
+    cloudNode.querySelector(".cloud-title").textContent = cloud.title;
+    renderFavoritePills(cloudNode.querySelector(".cloud-favorites"), cloud.tasks);
 
     const taskList = cloudNode.querySelector(".task-list");
     for (const task of cloud.tasks) {
@@ -161,17 +203,31 @@ function render() {
       taskNode.dataset.entityId = task.id;
       taskNode.querySelector(".task-title").textContent = task.title;
       taskNode.querySelector(".deadline-input").value = task.deadline || "";
+      taskNode.querySelector(".favorite-btn").textContent = task.favorite ? "★" : "☆";
+      taskNode.querySelector(".favorite-btn").classList.toggle("is-favorite", task.favorite);
       taskNode.classList.toggle("selected", state.selectedEntityId === task.id);
       taskNode.dataset.linkTarget = state.linkStartId && state.linkStartId !== task.id ? "true" : "false";
       setupTaskEvents(taskNode, cloud, task);
       taskList.append(taskNode);
     }
 
+    setupCloudEvents(cloudNode, cloud);
     elements.cloudLayer.append(cloudNode);
   }
 
   updateLinkStatus();
   renderConnections();
+}
+
+function renderFavoritePills(container, tasks) {
+  container.innerHTML = "";
+  for (const task of tasks.filter((item) => item.favorite)) {
+    const pill = document.createElement("div");
+    pill.className = "favorite-pill";
+    const deadlineMarkup = task.deadline ? `<time>${formatDate(task.deadline)}</time>` : "";
+    pill.innerHTML = `<span>${escapeHtml(task.title)}</span>${deadlineMarkup}`;
+    container.append(pill);
+  }
 }
 
 function setupCloudEvents(cloudNode, cloud) {
@@ -182,7 +238,6 @@ function setupCloudEvents(cloudNode, cloud) {
     }
 
     dragSession = {
-      type: "cloud",
       cloudId: cloud.id,
       startX: event.clientX,
       startY: event.clientY,
@@ -190,12 +245,8 @@ function setupCloudEvents(cloudNode, cloud) {
       originY: cloud.y,
     };
     state.selectedEntityId = cloud.id;
+    state.selectedCloudId = cloud.id;
     cloudNode.setPointerCapture(event.pointerId);
-    render();
-  });
-
-  cloudNode.addEventListener("dblclick", () => {
-    state.selectedEntityId = cloud.id;
     render();
   });
 
@@ -205,23 +256,31 @@ function setupCloudEvents(cloudNode, cloud) {
     render();
   });
 
-  cloudNode.querySelector(".add-task-btn").addEventListener("click", () => {
+  cloudNode.querySelector(".add-task-btn").addEventListener("click", (event) => {
+    event.stopPropagation();
     cloud.tasks.push(createTask("Новая задача"));
+    state.selectedCloudId = cloud.id;
     saveState();
     render();
   });
 
-  cloudNode.querySelector(".link-btn").addEventListener("click", () => {
+  cloudNode.querySelector(".link-btn").addEventListener("click", (event) => {
+    event.stopPropagation();
     activateLinkMode(cloud.id);
   });
 
-  cloudNode.addEventListener("click", () => {
+  cloudNode.addEventListener("click", (event) => {
+    if (event.target.closest(".task-row")) {
+      return;
+    }
+
     if (state.linkStartId && state.linkStartId !== cloud.id) {
       createLink(state.linkStartId, cloud.id);
       return;
     }
 
     state.selectedEntityId = cloud.id;
+    state.selectedCloudId = cloud.id;
     render();
   });
 }
@@ -236,6 +295,14 @@ function setupTaskEvents(taskNode, cloud, task) {
   taskNode.querySelector(".deadline-input").addEventListener("input", (event) => {
     task.deadline = event.target.value;
     saveState();
+    render();
+  });
+
+  taskNode.querySelector(".favorite-btn").addEventListener("click", (event) => {
+    event.stopPropagation();
+    task.favorite = !task.favorite;
+    saveState();
+    render();
   });
 
   taskNode.querySelector(".link-btn").addEventListener("click", (event) => {
@@ -259,6 +326,7 @@ function setupTaskEvents(taskNode, cloud, task) {
     }
 
     state.selectedEntityId = task.id;
+    state.selectedCloudId = cloud.id;
     render();
   });
 }
@@ -281,7 +349,8 @@ function handleZoom(event) {
 }
 
 function handlePanStart(event) {
-  if (!spacePressed && event.target !== elements.viewport) {
+  const isViewport = event.target === elements.viewport;
+  if (!spacePressed && !isViewport) {
     return;
   }
 
@@ -325,11 +394,18 @@ function handlePointerUp() {
 function activateLinkMode(entityId) {
   state.linkStartId = entityId;
   state.selectedEntityId = entityId;
+  state.selectedCloudId = findCloudByEntity(entityId)?.id || state.selectedCloudId;
   render();
 }
 
 function cancelLinkMode() {
   state.linkStartId = null;
+  render();
+}
+
+function clearSelection() {
+  state.selectedEntityId = null;
+  state.selectedCloudId = null;
   render();
 }
 
@@ -340,16 +416,13 @@ function createLink(from, to) {
   );
 
   if (!exists) {
-    state.links.push({
-      id: crypto.randomUUID(),
-      from,
-      to,
-    });
+    state.links.push(createLinkModel(from, to));
     saveState();
   }
 
   state.linkStartId = null;
   state.selectedEntityId = to;
+  state.selectedCloudId = findCloudByEntity(to)?.id || null;
   render();
 }
 
@@ -364,6 +437,7 @@ function removeTask(cloudId, taskId) {
 
   if (state.selectedEntityId === taskId) {
     state.selectedEntityId = cloudId;
+    state.selectedCloudId = cloudId;
   }
 }
 
@@ -371,7 +445,7 @@ function updateLinkStatus() {
   const active = Boolean(state.linkStartId);
   elements.linkModeStatus.textContent = active
     ? "Выбери вторую точку связи"
-    : "Не активен";
+    : "Режим обзора";
   elements.linkModeStatus.classList.toggle("active", active);
   elements.cancelLinkBtn.disabled = !active;
 }
@@ -385,32 +459,106 @@ function renderConnections() {
   for (const link of state.links) {
     const fromPoint = getEntityCenter(link.from);
     const toPoint = getEntityCenter(link.to);
-
     if (!fromPoint || !toPoint) {
       continue;
     }
 
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    const curve = Math.max(90, Math.abs(toPoint.x - fromPoint.x) * 0.35);
+    const curve = Math.max(90, Math.abs(toPoint.x - fromPoint.x) * 0.32);
     const d = `M ${fromPoint.x} ${fromPoint.y} C ${fromPoint.x + curve} ${fromPoint.y}, ${toPoint.x - curve} ${toPoint.y}, ${toPoint.x} ${toPoint.y}`;
     path.setAttribute("d", d);
-    path.setAttribute("class", "connection");
+
+    const active = state.selectedEntityId && (link.from === state.selectedEntityId || link.to === state.selectedEntityId);
+    path.setAttribute("class", active ? "connection active" : "connection");
     elements.connectionsLayer.append(path);
   }
 }
 
 function getEntityCenter(entityId) {
   const entityNode = elements.cloudLayer.querySelector(`[data-entity-id="${entityId}"]`);
-  if (!entityNode) {
+  if (entityNode) {
+    const viewportRect = elements.viewport.getBoundingClientRect();
+    const rect = entityNode.getBoundingClientRect();
+    return {
+      x: rect.left - viewportRect.left + rect.width / 2,
+      y: rect.top - viewportRect.top + rect.height / 2,
+    };
+  }
+
+  const owner = findCloudByEntity(entityId);
+  if (!owner) {
+    return null;
+  }
+
+  const cloudNode = elements.cloudLayer.querySelector(`[data-entity-id="${owner.id}"]`);
+  if (!cloudNode) {
     return null;
   }
 
   const viewportRect = elements.viewport.getBoundingClientRect();
-  const rect = entityNode.getBoundingClientRect();
+  const cloudRect = cloudNode.getBoundingClientRect();
+  const taskIndex = owner.tasks.findIndex((task) => task.id === entityId);
+  const orbitAngle = ((taskIndex + 1) / Math.max(owner.tasks.length, 1)) * Math.PI * 1.6;
   return {
-    x: rect.left - viewportRect.left + rect.width / 2,
-    y: rect.top - viewportRect.top + rect.height / 2,
+    x: cloudRect.left - viewportRect.left + cloudRect.width / 2 + Math.cos(orbitAngle) * 26,
+    y: cloudRect.top - viewportRect.top + cloudRect.height / 2 + Math.sin(orbitAngle) * 26,
   };
+}
+
+function findCloudByEntity(entityId) {
+  return state.clouds.find((cloud) =>
+    cloud.id === entityId || cloud.tasks.some((task) => task.id === entityId)
+  );
+}
+
+function screenToWorld(clientX, clientY) {
+  const rect = elements.viewport.getBoundingClientRect();
+  return {
+    x: (clientX - rect.left - state.view.x) / state.view.scale,
+    y: (clientY - rect.top - state.view.y) / state.view.scale,
+  };
+}
+
+function getBlobRadius(seed) {
+  if (seed < 0.25) {
+    return "46% 54% 41% 59% / 57% 39% 61% 43%";
+  }
+  if (seed < 0.5) {
+    return "54% 46% 58% 42% / 42% 58% 45% 55%";
+  }
+  if (seed < 0.75) {
+    return "42% 58% 48% 52% / 52% 37% 63% 48%";
+  }
+  return "58% 42% 53% 47% / 44% 56% 40% 60%";
+}
+
+function getBlobTilt(seed) {
+  return -6 + Math.round(seed * 12);
+}
+
+function formatDate(value) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+  });
+}
+
+function escapeHtml(value) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function loadState() {
@@ -424,6 +572,17 @@ function loadState() {
     state.view = parsed.view || state.view;
     state.clouds = parsed.clouds || [];
     state.links = parsed.links || [];
+
+    for (const cloud of state.clouds) {
+      if (typeof cloud.blobSeed !== "number") {
+        cloud.blobSeed = Math.random();
+      }
+      for (const task of cloud.tasks || []) {
+        if (typeof task.favorite !== "boolean") {
+          task.favorite = false;
+        }
+      }
+    }
   } catch (error) {
     console.warn("Не удалось загрузить состояние:", error);
   }
