@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
@@ -9,50 +9,54 @@
 <body>
   <div id="boardViewport" class="board-viewport">
     <div id="board" class="board">
-      <svg id="connectionsLayer" class="connections-layer"></svg>
       <div id="cloudLayer" class="cloud-layer"></div>
     </div>
   </div>
 
   <div class="floating-dock" aria-label="Инструменты">
-    <button id="createCloudBtn" class="dock-button dock-button-primary" title="Создать облако">+ Облако</button>
-    <button id="centerViewBtn" class="dock-button" title="Сбросить вид">Центр</button>
-    <button id="cancelLinkBtn" class="dock-button" title="Отменить связь" disabled>Отмена связи</button>
+    <button id="createCloudBtn" class="dock-button dock-button-primary">+ Облако</button>
+    <button id="centerViewBtn" class="dock-button">Центр</button>
   </div>
 
-  <div id="linkModeStatus" class="link-status" aria-live="polite">Режим обзора</div>
+  <div id="cloudStudio" class="cloud-studio" hidden>
+    <div class="cloud-studio-backdrop"></div>
+    <section class="cloud-studio-panel">
+      <header class="studio-header">
+        <div class="studio-title-wrap">
+          <p class="studio-kicker">Открытое облако</p>
+          <h2 id="studioTitle" class="studio-title editable" contenteditable="true" spellcheck="false"></h2>
+        </div>
+        <div class="studio-actions">
+          <button id="addTaskBtn" class="studio-button studio-button-primary">+ задача</button>
+          <button id="closeStudioBtn" class="studio-button">Закрыть</button>
+        </div>
+      </header>
+
+      <div class="studio-meta">
+        <span>Перетаскивай задачи внутри облака</span>
+        <span>Колесо: масштаб доски</span>
+        <span>Пробел + drag: панорама</span>
+      </div>
+
+      <div id="taskCanvas" class="task-canvas"></div>
+    </section>
+  </div>
 
   <template id="cloudTemplate">
-    <section class="cloud-node entity" data-type="cloud">
-      <div class="cloud-aurora"></div>
-      <div class="cloud-core">
-        <div class="cloud-title-wrap">
-          <h2 class="editable cloud-title" contenteditable="true" spellcheck="false"></h2>
-        </div>
-        <div class="cloud-favorites"></div>
-        <div class="cloud-details">
-          <div class="cloud-tools">
-            <button class="tool-button add-task-btn">+ задача</button>
-            <button class="tool-button link-btn">связать</button>
-          </div>
-          <div class="task-list"></div>
-        </div>
+    <article class="cloud-node">
+      <div class="cloud-shell">
+        <h3 class="cloud-title"></h3>
       </div>
-    </section>
+    </article>
   </template>
 
   <template id="taskTemplate">
-    <article class="task-row entity" data-type="task">
-      <div class="task-row-main">
-        <p class="editable task-title" contenteditable="true" spellcheck="false"></p>
-        <div class="task-meta">
-          <input class="deadline-input" type="date" aria-label="Дедлайн задачи">
-        </div>
-      </div>
-      <div class="task-row-actions">
-        <button class="task-action favorite-btn" title="Избранное">☆</button>
-        <button class="task-action link-btn" title="Связать">⟲</button>
-        <button class="task-action remove-btn" title="Удалить">×</button>
+    <article class="task-note">
+      <div class="task-grip"></div>
+      <textarea class="task-text" rows="3" spellcheck="false"></textarea>
+      <div class="task-footer">
+        <input class="deadline-input" type="date" aria-label="Дедлайн">
+        <button class="remove-task-btn" title="Удалить">×</button>
       </div>
     </article>
   </template>
