@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
@@ -19,7 +19,6 @@
   </div>
 
   <div id="cloudStudio" class="cloud-studio" hidden>
-    <div class="cloud-studio-backdrop"></div>
     <section class="cloud-studio-panel">
       <header class="studio-header">
         <div class="studio-title-wrap">
@@ -33,12 +32,16 @@
       </header>
 
       <div class="studio-meta">
-        <span>Перетаскивай задачи внутри облака</span>
+        <span>Перетаскивай узлы внутри облака</span>
+        <span>Добавляй подзадачи прямо из узла</span>
         <span>Колесо: масштаб доски</span>
         <span>Пробел + drag: панорама</span>
       </div>
 
-      <div id="taskCanvas" class="task-canvas"></div>
+      <div id="taskCanvas" class="task-canvas">
+        <svg id="taskEdges" class="task-edges"></svg>
+        <div id="taskNodes" class="task-nodes"></div>
+      </div>
     </section>
   </div>
 
@@ -56,7 +59,10 @@
       <textarea class="task-text" rows="3" spellcheck="false"></textarea>
       <div class="task-footer">
         <input class="deadline-input" type="date" aria-label="Дедлайн">
-        <button class="remove-task-btn" title="Удалить">×</button>
+        <div class="task-buttons">
+          <button class="spawn-task-btn" title="Подзадача">+</button>
+          <button class="remove-task-btn" title="Удалить">×</button>
+        </div>
       </div>
     </article>
   </template>

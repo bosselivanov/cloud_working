@@ -1,4 +1,4 @@
-const STORAGE_KEY = "cloud-graph-state-v3";
+﻿const STORAGE_KEY = "cloud-graph-state-v4";
 
 const state = {
   view: { x: 0, y: 0, scale: 1 },
@@ -15,10 +15,13 @@ const elements = {
   createCloudBtn: document.getElementById("createCloudBtn"),
   centerViewBtn: document.getElementById("centerViewBtn"),
   studio: document.getElementById("cloudStudio"),
+  studioPanel: document.querySelector(".cloud-studio-panel"),
   studioTitle: document.getElementById("studioTitle"),
   closeStudioBtn: document.getElementById("closeStudioBtn"),
   addTaskBtn: document.getElementById("addTaskBtn"),
   taskCanvas: document.getElementById("taskCanvas"),
+  taskEdges: document.getElementById("taskEdges"),
+  taskNodes: document.getElementById("taskNodes"),
 };
 
 let cloudDrag = null;
@@ -38,48 +41,56 @@ function bootstrap() {
 }
 
 function seedDemo() {
+  const economicsTasks = [
+    createTask("Учебник и структура тем", 80, 70, "2026-07-06"),
+    createTask("Практика и задачи", 420, 180, "2026-07-12"),
+    createTask("Конспект по слабым местам", 250, 360, ""),
+  ];
+  const booksTasks = [
+    createTask("Подобрать список чтения", 90, 90, "2026-07-05"),
+    createTask("Выписать идеи", 380, 260, ""),
+  ];
+  const studyTasks = [
+    createTask("Вебинар", 100, 120, "2026-07-04"),
+    createTask("План на неделю", 420, 320, ""),
+  ];
+
   state.clouds = [
     createCloudModel({
       title: "Экономика",
       x: 180,
       y: 180,
-      tasks: [
-        createTask("Учебник и структура тем", 80, 70, "2026-07-06"),
-        createTask("Практика и задачи", 420, 180, "2026-07-12"),
-        createTask("Конспект по слабым местам", 250, 360, ""),
-      ],
+      tasks: economicsTasks,
+      edges: [createEdge(economicsTasks[0].id, economicsTasks[1].id), createEdge(economicsTasks[1].id, economicsTasks[2].id)],
       blobSeed: 0.16,
     }),
     createCloudModel({
       title: "Книги",
       x: 860,
       y: 210,
-      tasks: [
-        createTask("Подобрать список чтения", 90, 90, "2026-07-05"),
-        createTask("Выписать идеи", 380, 260, ""),
-      ],
+      tasks: booksTasks,
+      edges: [createEdge(booksTasks[0].id, booksTasks[1].id)],
       blobSeed: 0.58,
     }),
     createCloudModel({
       title: "Учеба",
       x: 380,
       y: 640,
-      tasks: [
-        createTask("Вебинар", 100, 120, "2026-07-04"),
-        createTask("План на неделю", 420, 320, ""),
-      ],
+      tasks: studyTasks,
+      edges: [createEdge(studyTasks[0].id, studyTasks[1].id)],
       blobSeed: 0.82,
     }),
   ];
 }
 
-function createCloudModel({ title, x, y, tasks = [], blobSeed = Math.random() }) {
+function createCloudModel({ title, x, y, tasks = [], edges = [], blobSeed = Math.random() }) {
   return {
     id: crypto.randomUUID(),
     title,
     x,
     y,
     tasks,
+    edges,
     blobSeed,
   };
 }
@@ -91,6 +102,14 @@ function createTask(text = "Новая задача", x = 120, y = 90, deadline 
     x,
     y,
     deadline,
+  };
+}
+
+function createEdge(from, to) {
+  return {
+    id: crypto.randomUUID(),
+    from,
+    to,
   };
 }
 
@@ -109,11 +128,6 @@ function bindGlobalEvents() {
   elements.closeStudioBtn.addEventListener("click", closeStudio);
   elements.addTaskBtn.addEventListener("click", addTaskToOpenCloud);
   elements.studioTitle.addEventListener("blur", handleStudioTitleBlur);
-  elements.studio.addEventListener("click", (event) => {
-    if (event.target.classList.contains("cloud-studio-backdrop")) {
-      closeStudio();
-    }
-  });
 
   elements.viewport.addEventListener("wheel", handleZoom, { passive: false });
   elements.viewport.addEventListener("pointerdown", handlePanStart);
@@ -131,9 +145,10 @@ function createCloud(x = 240 + state.clouds.length * 52, y = 180 + state.clouds.
     x,
     y,
     tasks: [createTask("Первая мысль", 120, 100, "")],
+    edges: [],
   });
   state.clouds.push(cloud);
-  state.openCloudId = cloud.id;
+  openCloud(cloud.id);
 }
 
 function render() {
@@ -163,7 +178,6 @@ function renderClouds() {
       if (spacePressed) {
         return;
       }
-
       cloudDrag = {
         cloudId: cloud.id,
         startX: event.clientX,
@@ -186,13 +200,17 @@ function renderStudio() {
   const cloud = getOpenCloud();
   if (!cloud) {
     elements.studio.hidden = true;
-    elements.taskCanvas.innerHTML = "";
+    elements.taskEdges.innerHTML = "";
+    elements.taskNodes.innerHTML = "";
     return;
   }
 
   elements.studio.hidden = false;
   elements.studioTitle.textContent = cloud.title;
-  elements.taskCanvas.innerHTML = "";
+  elements.taskEdges.innerHTML = "";
+  elements.taskNodes.innerHTML = "";
+
+  renderTaskEdges(cloud);
 
   for (const task of cloud.tasks) {
     const taskNode = elements.taskTemplate.content.firstElementChild.cloneNode(true);
@@ -202,12 +220,11 @@ function renderStudio() {
     taskNode.querySelector(".task-text").value = task.text;
     taskNode.querySelector(".deadline-input").value = task.deadline || "";
 
-    const interactiveSelector = ".task-text, .deadline-input, .remove-task-btn";
+    const interactiveSelector = ".task-text, .deadline-input, .remove-task-btn, .spawn-task-btn";
     taskNode.addEventListener("pointerdown", (event) => {
       if (event.target.closest(interactiveSelector)) {
         return;
       }
-
       taskDrag = {
         taskId: task.id,
         startX: event.clientX,
@@ -228,19 +245,48 @@ function renderStudio() {
       saveState();
     });
 
+    taskNode.querySelector(".spawn-task-btn").addEventListener("click", () => {
+      spawnChildTask(cloud, task);
+    });
+
     taskNode.querySelector(".remove-task-btn").addEventListener("click", () => {
       cloud.tasks = cloud.tasks.filter((item) => item.id !== task.id);
+      cloud.edges = (cloud.edges || []).filter((edge) => edge.from !== task.id && edge.to !== task.id);
       saveState();
       renderStudio();
     });
 
-    elements.taskCanvas.append(taskNode);
+    elements.taskNodes.append(taskNode);
+  }
+}
+
+function renderTaskEdges(cloud) {
+  const canvasRect = elements.taskCanvas.getBoundingClientRect();
+  elements.taskEdges.setAttribute("viewBox", `0 0 ${canvasRect.width} ${canvasRect.height}`);
+
+  for (const edge of cloud.edges || []) {
+    const from = cloud.tasks.find((task) => task.id === edge.from);
+    const to = cloud.tasks.find((task) => task.id === edge.to);
+    if (!from || !to) {
+      continue;
+    }
+
+    const startX = from.x + 240;
+    const startY = from.y + 78;
+    const endX = to.x;
+    const endY = to.y + 78;
+    const curve = Math.max(80, Math.abs(endX - startX) * 0.35);
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", `M ${startX} ${startY} C ${startX + curve} ${startY}, ${endX - curve} ${endY}, ${endX} ${endY}`);
+    path.setAttribute("class", "task-edge");
+    elements.taskEdges.append(path);
   }
 }
 
 function openCloud(cloudId) {
   state.openCloudId = cloudId;
   render();
+  animateCloudOpening(cloudId);
 }
 
 function closeStudio() {
@@ -256,6 +302,15 @@ function addTaskToOpenCloud() {
 
   const offset = cloud.tasks.length * 26;
   cloud.tasks.push(createTask("Новая задача", 90 + offset, 90 + offset, ""));
+  saveState();
+  renderStudio();
+}
+
+function spawnChildTask(cloud, parentTask) {
+  const child = createTask("Подзадача", parentTask.x + 280, parentTask.y + 40, "");
+  cloud.tasks.push(child);
+  cloud.edges = cloud.edges || [];
+  cloud.edges.push(createEdge(parentTask.id, child.id));
   saveState();
   renderStudio();
 }
@@ -341,11 +396,8 @@ function handlePointerMove(event) {
     }
 
     const canvasRect = elements.taskCanvas.getBoundingClientRect();
-    const nextX = taskDrag.originX + (event.clientX - taskDrag.startX);
-    const nextY = taskDrag.originY + (event.clientY - taskDrag.startY);
-
-    task.x = clamp(nextX, 14, Math.max(14, canvasRect.width - 254));
-    task.y = clamp(nextY, 14, Math.max(14, canvasRect.height - 170));
+    task.x = clamp(taskDrag.originX + (event.clientX - taskDrag.startX), 14, Math.max(14, canvasRect.width - 254));
+    task.y = clamp(taskDrag.originY + (event.clientY - taskDrag.startY), 14, Math.max(14, canvasRect.height - 170));
     renderStudio();
     return;
   }
@@ -385,6 +437,32 @@ function handleKeyUp(event) {
 
 function getOpenCloud() {
   return state.clouds.find((cloud) => cloud.id === state.openCloudId) || null;
+}
+
+function animateCloudOpening(cloudId) {
+  const source = elements.cloudLayer.querySelector(`[data-cloud-id="${cloudId}"] .cloud-shell`);
+  if (!source) {
+    return;
+  }
+
+  const start = source.getBoundingClientRect();
+  const finish = elements.studioPanel.getBoundingClientRect();
+  elements.studioPanel.animate(
+    [
+      {
+        opacity: 0,
+        transform: `translate(${start.left - finish.left}px, ${start.top - finish.top}px) scale(${start.width / finish.width}, ${start.height / finish.height})`,
+      },
+      {
+        opacity: 1,
+        transform: "translate(0, 0) scale(1)",
+      },
+    ],
+    {
+      duration: 420,
+      easing: "cubic-bezier(0.2, 0.8, 0.18, 1)",
+    }
+  );
 }
 
 function screenToWorld(clientX, clientY) {
@@ -431,6 +509,7 @@ function loadState() {
       if (typeof cloud.blobSeed !== "number") {
         cloud.blobSeed = Math.random();
       }
+      cloud.edges = Array.isArray(cloud.edges) ? cloud.edges : [];
       cloud.tasks = (cloud.tasks || []).map((task) => ({
         id: task.id || crypto.randomUUID(),
         text: task.text || task.title || "Новая задача",
