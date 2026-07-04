@@ -301,10 +301,27 @@ body.has-open-cloud .floating-dock {
   filter: drop-shadow(0 6px 10px rgba(184, 146, 69, 0.12));
 }
 
+.task-edge--idea {
+  stroke: rgba(63, 127, 187, 0.38);
+}
+
+.task-edge--task {
+  stroke: rgba(184, 146, 69, 0.34);
+}
+
+.task-edge--decision {
+  stroke: rgba(43, 154, 107, 0.38);
+}
+
+.task-edge--risk {
+  stroke: rgba(191, 95, 69, 0.38);
+  stroke-dasharray: 10 10;
+}
+
 .task-note {
   position: absolute;
-  width: 240px;
-  min-height: 156px;
+  width: 284px;
+  min-height: 182px;
   padding: 14px 16px 16px;
   border-radius: 24px;
   border: 1px solid rgba(184, 146, 69, 0.16);
@@ -345,6 +362,7 @@ body.has-open-cloud .floating-dock {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  min-width: 0;
 }
 
 .task-type-badge,
@@ -359,12 +377,17 @@ body.has-open-cloud .floating-dock {
   background: rgba(22, 22, 22, 0.05);
   color: var(--ink);
   text-transform: uppercase;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .type-cycle-btn {
   padding: 6px 10px;
   background: rgba(22, 22, 22, 0.06);
   color: var(--muted);
+  flex-shrink: 0;
 }
 
 .task-grip {
@@ -377,28 +400,32 @@ body.has-open-cloud .floating-dock {
 .task-text {
   width: 100%;
   height: 100%;
-  min-height: 72px;
+  min-height: 82px;
   resize: none;
   border: 0;
   background: transparent;
   color: var(--ink);
   line-height: 1.45;
   outline: none;
+  font-size: 1rem;
 }
 
 .task-footer {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
 }
 
 .task-buttons {
   display: flex;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .deadline-input {
+  width: 100%;
+  min-width: 0;
   padding: 7px 10px;
   border-radius: 999px;
   border: 1px solid rgba(184, 146, 69, 0.18);
@@ -504,7 +531,7 @@ body.has-open-cloud .floating-dock {
   }
 
   .task-note {
-    width: 210px;
+    width: 238px;
   }
 
   .floating-dock {

@@ -224,10 +224,7 @@ function renderStudio() {
 
   elements.studio.hidden = false;
   elements.studioTitle.textContent = cloud.title;
-  elements.taskEdges.innerHTML = "";
   elements.taskNodes.innerHTML = "";
-
-  renderTaskEdges(cloud);
 
   for (const task of cloud.tasks) {
     const taskNode = elements.taskTemplate.content.firstElementChild.cloneNode(true);
@@ -285,11 +282,13 @@ function renderStudio() {
 
     elements.taskNodes.append(taskNode);
   }
+
+  renderTaskEdges(cloud);
 }
 
 function renderTaskEdges(cloud) {
-  const canvasRect = elements.taskCanvas.getBoundingClientRect();
   elements.taskEdges.innerHTML = "";
+  const canvasRect = elements.taskCanvas.getBoundingClientRect();
   elements.taskEdges.setAttribute("viewBox", `0 0 ${canvasRect.width} ${canvasRect.height}`);
 
   for (const edge of cloud.edges || []) {
@@ -299,14 +298,28 @@ function renderTaskEdges(cloud) {
       continue;
     }
 
-    const startX = from.x + 240;
-    const startY = from.y + 78;
-    const endX = to.x;
-    const endY = to.y + 78;
+    const fromNode = elements.taskNodes.querySelector(`[data-task-id="${from.id}"]`);
+    const toNode = elements.taskNodes.querySelector(`[data-task-id="${to.id}"]`);
+    if (!fromNode || !toNode) {
+      continue;
+    }
+
+    const startPort = fromNode.querySelector(".task-port-out");
+    const endPort = toNode.querySelector(".task-port-in");
+    if (!startPort || !endPort) {
+      continue;
+    }
+
+    const startRect = startPort.getBoundingClientRect();
+    const endRect = endPort.getBoundingClientRect();
+    const startX = startRect.left - canvasRect.left + startRect.width / 2;
+    const startY = startRect.top - canvasRect.top + startRect.height / 2;
+    const endX = endRect.left - canvasRect.left + endRect.width / 2;
+    const endY = endRect.top - canvasRect.top + endRect.height / 2;
     const curve = Math.max(80, Math.abs(endX - startX) * 0.35);
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
     path.setAttribute("d", `M ${startX} ${startY} C ${startX + curve} ${startY}, ${endX - curve} ${endY}, ${endX} ${endY}`);
-    path.setAttribute("class", "task-edge");
+    path.setAttribute("class", `task-edge task-edge--${to.type || from.type || "task"}`);
     elements.taskEdges.append(path);
   }
 }
