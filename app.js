@@ -6,6 +6,14 @@ const state = {
   openCloudId: null,
 };
 
+const TASK_TYPES = ["idea", "task", "decision", "risk"];
+const TASK_TYPE_LABELS = {
+  idea: "идея",
+  task: "задача",
+  decision: "решение",
+  risk: "риск",
+};
+
 const elements = {
   viewport: document.getElementById("boardViewport"),
   board: document.getElementById("board"),
@@ -43,17 +51,17 @@ function bootstrap() {
 
 function seedDemo() {
   const economicsTasks = [
-    createTask("Учебник и структура тем", 80, 70, "2026-07-06"),
-    createTask("Практика и задачи", 420, 180, "2026-07-12"),
-    createTask("Конспект по слабым местам", 250, 360, ""),
+    createTask("Учебник и структура тем", 80, 70, "2026-07-06", "idea"),
+    createTask("Практика и задачи", 420, 180, "2026-07-12", "task"),
+    createTask("Конспект по слабым местам", 250, 360, "", "decision"),
   ];
   const booksTasks = [
-    createTask("Подобрать список чтения", 90, 90, "2026-07-05"),
-    createTask("Выписать идеи", 380, 260, ""),
+    createTask("Подобрать список чтения", 90, 90, "2026-07-05", "task"),
+    createTask("Выписать идеи", 380, 260, "", "idea"),
   ];
   const studyTasks = [
-    createTask("Вебинар", 100, 120, "2026-07-04"),
-    createTask("План на неделю", 420, 320, ""),
+    createTask("Вебинар", 100, 120, "2026-07-04", "task"),
+    createTask("План на неделю", 420, 320, "", "risk"),
   ];
 
   state.clouds = [
@@ -96,13 +104,14 @@ function createCloudModel({ title, x, y, tasks = [], edges = [], blobSeed = Math
   };
 }
 
-function createTask(text = "Новая задача", x = 120, y = 90, deadline = "") {
+function createTask(text = "Новая задача", x = 120, y = 90, deadline = "", type = "task") {
   return {
     id: crypto.randomUUID(),
     text,
     x,
     y,
     deadline,
+    type,
   };
 }
 
@@ -153,6 +162,7 @@ function createCloud(x = 240 + state.clouds.length * 52, y = 180 + state.clouds.
 }
 
 function render() {
+  document.body.classList.toggle("has-open-cloud", Boolean(state.openCloudId));
   renderBoardTransform();
   renderClouds();
   renderStudio();
@@ -173,6 +183,7 @@ function renderClouds() {
     node.style.setProperty("--blob-radius", getBlobRadius(cloud.blobSeed));
     node.style.setProperty("--blob-tilt", `${getBlobTilt(cloud.blobSeed)}deg`);
     node.classList.toggle("is-open", state.openCloudId === cloud.id);
+    node.classList.toggle("is-context", Boolean(state.openCloudId) && state.openCloudId !== cloud.id);
     node.querySelector(".cloud-title").textContent = cloud.title;
 
     node.addEventListener("pointerdown", (event) => {
@@ -221,8 +232,10 @@ function renderStudio() {
   for (const task of cloud.tasks) {
     const taskNode = elements.taskTemplate.content.firstElementChild.cloneNode(true);
     taskNode.dataset.taskId = task.id;
+    taskNode.dataset.taskType = task.type || "task";
     taskNode.style.left = `${task.x}px`;
     taskNode.style.top = `${task.y}px`;
+    taskNode.querySelector(".task-type-badge").textContent = TASK_TYPE_LABELS[task.type || "task"];
     taskNode.querySelector(".task-text").value = task.text;
     taskNode.querySelector(".deadline-input").value = task.deadline || "";
 
@@ -251,6 +264,12 @@ function renderStudio() {
     taskNode.querySelector(".deadline-input").addEventListener("input", (event) => {
       task.deadline = event.target.value;
       saveState();
+    });
+
+    taskNode.querySelector(".type-cycle-btn").addEventListener("click", () => {
+      task.type = nextTaskType(task.type);
+      saveState();
+      renderStudio();
     });
 
     taskNode.querySelector(".spawn-task-btn").addEventListener("click", () => {
@@ -316,7 +335,7 @@ function addTaskToOpenCloud() {
 }
 
 function spawnChildTask(cloud, parentTask) {
-  const child = createTask("Подзадача", parentTask.x + 280, parentTask.y + 40, "");
+  const child = createTask("Подзадача", parentTask.x + 280, parentTask.y + 40, "", inferChildType(parentTask.type));
   cloud.tasks.push(child);
   cloud.edges = cloud.edges || [];
   cloud.edges.push(createEdge(parentTask.id, child.id));
@@ -526,6 +545,21 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
+function nextTaskType(currentType = "task") {
+  const currentIndex = TASK_TYPES.indexOf(currentType);
+  return TASK_TYPES[(currentIndex + 1 + TASK_TYPES.length) % TASK_TYPES.length];
+}
+
+function inferChildType(parentType = "task") {
+  if (parentType === "idea") {
+    return "task";
+  }
+  if (parentType === "task") {
+    return "decision";
+  }
+  return "task";
+}
+
 function loadState() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -548,6 +582,7 @@ function loadState() {
         x: typeof task.x === "number" ? task.x : 120,
         y: typeof task.y === "number" ? task.y : 100,
         deadline: task.deadline || "",
+        type: TASK_TYPES.includes(task.type) ? task.type : "task",
       }));
     }
   } catch (error) {

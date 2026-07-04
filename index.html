@@ -34,6 +34,7 @@
       <div class="studio-meta">
         <span>Перетаскивай узлы внутри облака</span>
         <span>Добавляй подзадачи прямо из узла</span>
+        <span>Тип узла меняется по кнопке роли</span>
         <span>Колесо: масштаб доски</span>
         <span>Пробел + drag: панорама</span>
       </div>
@@ -55,6 +56,12 @@
 
   <template id="taskTemplate">
     <article class="task-note">
+      <div class="task-port task-port-in"></div>
+      <div class="task-port task-port-out"></div>
+      <div class="task-note-head">
+        <span class="task-type-badge"></span>
+        <button class="type-cycle-btn" title="Сменить тип">роль</button>
+      </div>
       <div class="task-grip"></div>
       <textarea class="task-text" rows="3" spellcheck="false"></textarea>
       <div class="task-footer">

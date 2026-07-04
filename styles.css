@@ -8,6 +8,10 @@
   --muted: rgba(22, 22, 22, 0.52);
   --shadow: 0 24px 80px rgba(42, 35, 18, 0.08);
   --shadow-soft: 0 12px 36px rgba(42, 35, 18, 0.08);
+  --idea: #3f7fbb;
+  --task: #b89245;
+  --decision: #2b9a6b;
+  --risk: #bf5f45;
 }
 
 * {
@@ -106,6 +110,7 @@ textarea {
   padding: 18px;
   cursor: grab;
   user-select: none;
+  transition: transform 220ms ease, opacity 220ms ease, filter 220ms ease;
 }
 
 .cloud-node:active {
@@ -131,6 +136,16 @@ textarea {
 .cloud-node:hover .cloud-shell,
 .cloud-node.is-open .cloud-shell {
   box-shadow: 0 0 0 2px rgba(184, 146, 69, 0.18), var(--shadow);
+}
+
+.cloud-node.is-context {
+  opacity: 0.54;
+  filter: blur(1px) saturate(0.88);
+  transform: scale(0.94);
+}
+
+.cloud-node.is-open {
+  transform: scale(1.03);
 }
 
 .cloud-title {
@@ -178,6 +193,12 @@ textarea {
   box-shadow: 0 36px 110px rgba(42, 35, 18, 0.08);
   backdrop-filter: blur(12px);
   z-index: -1;
+}
+
+body.has-open-cloud .floating-dock {
+  opacity: 0.4;
+  transform: translateY(12px);
+  pointer-events: none;
 }
 
 .studio-header {
@@ -284,19 +305,66 @@ textarea {
   position: absolute;
   width: 240px;
   min-height: 156px;
-  padding: 16px;
+  padding: 14px 16px 16px;
   border-radius: 24px;
   border: 1px solid rgba(184, 146, 69, 0.16);
   background: rgba(255, 255, 255, 0.94);
   box-shadow: var(--shadow-soft);
   display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 12px;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 10px;
   cursor: grab;
 }
 
 .task-note:active {
   cursor: grabbing;
+}
+
+.task-port {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  transform: translateY(-50%);
+  background: white;
+  border: 3px solid currentColor;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.7);
+}
+
+.task-port-in {
+  left: -7px;
+}
+
+.task-port-out {
+  right: -7px;
+}
+
+.task-note-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.task-type-badge,
+.type-cycle-btn {
+  border-radius: 999px;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+}
+
+.task-type-badge {
+  padding: 6px 10px;
+  background: rgba(22, 22, 22, 0.05);
+  color: var(--ink);
+  text-transform: uppercase;
+}
+
+.type-cycle-btn {
+  padding: 6px 10px;
+  background: rgba(22, 22, 22, 0.06);
+  color: var(--muted);
 }
 
 .task-grip {
@@ -349,6 +417,77 @@ textarea {
 .spawn-task-btn {
   color: var(--gold);
   font-size: 1.2rem;
+}
+
+.task-note[data-task-type="idea"] {
+  border-color: rgba(63, 127, 187, 0.22);
+  box-shadow: 0 12px 36px rgba(63, 127, 187, 0.08);
+  color: var(--idea);
+}
+
+.task-note[data-task-type="task"] {
+  border-color: rgba(184, 146, 69, 0.2);
+  color: var(--task);
+}
+
+.task-note[data-task-type="decision"] {
+  border-color: rgba(43, 154, 107, 0.22);
+  box-shadow: 0 12px 36px rgba(43, 154, 107, 0.08);
+  color: var(--decision);
+}
+
+.task-note[data-task-type="risk"] {
+  border-color: rgba(191, 95, 69, 0.24);
+  box-shadow: 0 12px 36px rgba(191, 95, 69, 0.08);
+  color: var(--risk);
+}
+
+.task-note[data-task-type="idea"] .task-type-badge,
+.task-note[data-task-type="idea"] .type-cycle-btn {
+  background: rgba(63, 127, 187, 0.1);
+}
+
+.task-note[data-task-type="task"] .task-type-badge,
+.task-note[data-task-type="task"] .type-cycle-btn {
+  background: rgba(184, 146, 69, 0.1);
+}
+
+.task-note[data-task-type="decision"] .task-type-badge,
+.task-note[data-task-type="decision"] .type-cycle-btn {
+  background: rgba(43, 154, 107, 0.1);
+}
+
+.task-note[data-task-type="risk"] .task-type-badge,
+.task-note[data-task-type="risk"] .type-cycle-btn {
+  background: rgba(191, 95, 69, 0.1);
+}
+
+.task-note[data-task-type="idea"] .task-port,
+.task-note[data-task-type="idea"] .task-type-badge {
+  color: var(--idea);
+}
+
+.task-note[data-task-type="task"] .task-port,
+.task-note[data-task-type="task"] .task-type-badge {
+  color: var(--task);
+}
+
+.task-note[data-task-type="decision"] .task-port,
+.task-note[data-task-type="decision"] .task-type-badge {
+  color: var(--decision);
+}
+
+.task-note[data-task-type="risk"] .task-port,
+.task-note[data-task-type="risk"] .task-type-badge {
+  color: var(--risk);
+}
+
+.task-note .task-text,
+.task-note .deadline-input,
+.task-note .remove-task-btn,
+.task-note .spawn-task-btn,
+.task-note .type-cycle-btn {
+  color: inherit;
 }
 
 @media (max-width: 980px) {
