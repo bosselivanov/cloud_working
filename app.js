@@ -184,6 +184,7 @@ function renderClouds() {
         startY: event.clientY,
         originX: cloud.x,
         originY: cloud.y,
+        node,
       };
       node.setPointerCapture(event.pointerId);
     });
@@ -231,6 +232,7 @@ function renderStudio() {
         startY: event.clientY,
         originX: task.x,
         originY: task.y,
+        node: taskNode,
       };
       taskNode.setPointerCapture(event.pointerId);
     });
@@ -262,6 +264,7 @@ function renderStudio() {
 
 function renderTaskEdges(cloud) {
   const canvasRect = elements.taskCanvas.getBoundingClientRect();
+  elements.taskEdges.innerHTML = "";
   elements.taskEdges.setAttribute("viewBox", `0 0 ${canvasRect.width} ${canvasRect.height}`);
 
   for (const edge of cloud.edges || []) {
@@ -380,7 +383,8 @@ function handlePointerMove(event) {
 
     cloud.x = cloudDrag.originX + (event.clientX - cloudDrag.startX) / state.view.scale;
     cloud.y = cloudDrag.originY + (event.clientY - cloudDrag.startY) / state.view.scale;
-    renderClouds();
+    cloudDrag.node.style.left = `${cloud.x}px`;
+    cloudDrag.node.style.top = `${cloud.y}px`;
     return;
   }
 
@@ -398,7 +402,9 @@ function handlePointerMove(event) {
     const canvasRect = elements.taskCanvas.getBoundingClientRect();
     task.x = clamp(taskDrag.originX + (event.clientX - taskDrag.startX), 14, Math.max(14, canvasRect.width - 254));
     task.y = clamp(taskDrag.originY + (event.clientY - taskDrag.startY), 14, Math.max(14, canvasRect.height - 170));
-    renderStudio();
+    taskDrag.node.style.left = `${task.x}px`;
+    taskDrag.node.style.top = `${task.y}px`;
+    renderTaskEdges(cloud);
     return;
   }
 
