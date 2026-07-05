@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cloud Graph</title>
-  <link rel="stylesheet" href="styles.css?v=9">
+  <link rel="stylesheet" href="styles.css?v=10">
 </head>
 <body>
   <div id="boardViewport" class="board-viewport">
@@ -55,6 +55,8 @@
   <template id="cloudTemplate">
     <article class="cloud-node">
       <div class="cloud-shell">
+        <div class="cloud-connectors cloud-connectors-left"></div>
+        <div class="cloud-connectors cloud-connectors-right"></div>
         <h3 class="cloud-title"></h3>
       </div>
     </article>
@@ -83,8 +85,8 @@
 
   <template id="sharedTemplate">
     <article class="shared-note">
-      <div class="shared-port shared-port-in"></div>
-      <div class="shared-port shared-port-out"></div>
+      <div class="shared-connectors shared-connectors-left"></div>
+      <div class="shared-connectors shared-connectors-right"></div>
       <div class="shared-note-head">
         <span class="shared-type-badge"></span>
         <button class="shared-picker-toggle-btn" title="Привязать облака">облака</button>
@@ -102,7 +104,7 @@
     </article>
   </template>
 
-  <script src="app.js?v=9"></script>
+  <script src="app.js?v=10"></script>
 </body>
 </html>
 

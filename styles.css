@@ -157,6 +157,7 @@ textarea {
   display: flex;
   align-items: center;
   transition: box-shadow 180ms ease, transform 220ms ease;
+  overflow: visible;
 }
 
 .cloud-node:hover .cloud-shell,
@@ -182,11 +183,45 @@ textarea {
   max-width: 86%;
 }
 
+.cloud-connectors,
+.shared-connectors {
+  position: absolute;
+  top: 22px;
+  bottom: 22px;
+  width: 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.cloud-connectors-left,
+.shared-connectors-left {
+  left: -10px;
+}
+
+.cloud-connectors-right,
+.shared-connectors-right {
+  right: -10px;
+}
+
+.cloud-connector-socket,
+.shared-connector-socket {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.98);
+  border: 3px solid rgba(184, 146, 69, 0.54);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.72);
+}
+
 .board-edge {
   fill: none;
   stroke: rgba(184, 146, 69, 0.28);
   stroke-width: 4;
   stroke-linecap: round;
+  stroke-linejoin: round;
   filter: drop-shadow(0 10px 22px rgba(184, 146, 69, 0.12));
 }
 
@@ -571,26 +606,6 @@ body.has-open-cloud .floating-dock {
   box-shadow: 0 0 0 2px rgba(184, 146, 69, 0.22), 0 22px 58px rgba(42, 35, 18, 0.12);
 }
 
-.shared-port {
-  position: absolute;
-  top: 50%;
-  width: 16px;
-  height: 16px;
-  border-radius: 999px;
-  transform: translateY(-50%);
-  background: rgba(255, 255, 255, 0.96);
-  border: 3px solid currentColor;
-  box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.64);
-}
-
-.shared-port-in {
-  left: -8px;
-}
-
-.shared-port-out {
-  right: -8px;
-}
-
 .shared-note-head,
 .shared-footer {
   display: flex;
@@ -711,6 +726,26 @@ body.has-open-cloud .floating-dock {
   color: var(--risk);
   border-radius: 24px 24px 24px 52px;
   clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%);
+}
+
+.shared-note[data-task-type="idea"] .shared-connector-socket,
+.cloud-node .cloud-connector-socket[data-task-type="idea"] {
+  border-color: rgba(63, 127, 187, 0.62);
+}
+
+.shared-note[data-task-type="task"] .shared-connector-socket,
+.cloud-node .cloud-connector-socket[data-task-type="task"] {
+  border-color: rgba(184, 146, 69, 0.58);
+}
+
+.shared-note[data-task-type="decision"] .shared-connector-socket,
+.cloud-node .cloud-connector-socket[data-task-type="decision"] {
+  border-color: rgba(43, 154, 107, 0.6);
+}
+
+.shared-note[data-task-type="risk"] .shared-connector-socket,
+.cloud-node .cloud-connector-socket[data-task-type="risk"] {
+  border-color: rgba(191, 95, 69, 0.64);
 }
 
 .shared-note[data-task-type="idea"] .shared-type-badge,

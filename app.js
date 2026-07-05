@@ -247,6 +247,7 @@ function renderClouds() {
     node.classList.toggle("is-open", state.openCloudId === cloud.id);
     node.classList.toggle("is-context", Boolean(state.openCloudId) && state.openCloudId !== cloud.id);
     node.querySelector(".cloud-title").textContent = cloud.title;
+    renderCloudConnectors(node, cloud);
 
     node.addEventListener("pointerdown", (event) => {
       if (spacePressed) {
@@ -291,6 +292,7 @@ function renderSharedTasks() {
     node.querySelector(".shared-deadline-input").value = sharedTask.deadline || "";
     node.querySelector(".shared-type-cycle-btn").textContent = TASK_TYPE_LABELS[sharedTask.type || "task"];
 
+    renderSharedConnectors(node, sharedTask);
     renderSharedCloudChips(node.querySelector(".shared-clouds"), sharedTask);
     renderSharedCloudPicker(node.querySelector(".shared-cloud-picker"), sharedTask);
 
@@ -348,6 +350,39 @@ function renderSharedTasks() {
   }
 
   syncSharedPickerVisibility();
+}
+
+function renderCloudConnectors(node, cloud) {
+  const leftContainer = node.querySelector(".cloud-connectors-left");
+  const rightContainer = node.querySelector(".cloud-connectors-right");
+  leftContainer.innerHTML = "";
+  rightContainer.innerHTML = "";
+
+  const relations = getCloudRelations(cloud.id);
+  appendConnectorSockets(leftContainer, relations.filter((relation) => relation.side === "left"), "cloud", cloud.id);
+  appendConnectorSockets(rightContainer, relations.filter((relation) => relation.side === "right"), "cloud", cloud.id);
+}
+
+function renderSharedConnectors(node, sharedTask) {
+  const leftContainer = node.querySelector(".shared-connectors-left");
+  const rightContainer = node.querySelector(".shared-connectors-right");
+  leftContainer.innerHTML = "";
+  rightContainer.innerHTML = "";
+
+  const relations = getSharedRelations(sharedTask.id);
+  appendConnectorSockets(leftContainer, relations.filter((relation) => relation.side === "left"), "shared", sharedTask.id);
+  appendConnectorSockets(rightContainer, relations.filter((relation) => relation.side === "right"), "shared", sharedTask.id);
+}
+
+function appendConnectorSockets(container, relations, kind, ownerId) {
+  for (const relation of relations) {
+    const socket = document.createElement("div");
+    socket.className = `${kind}-connector-socket`;
+    socket.dataset.relationId = relation.relationId;
+    socket.dataset.ownerId = ownerId;
+    socket.dataset.taskType = relation.type || "task";
+    container.append(socket);
+  }
 }
 
 function renderSharedCloudChips(container, sharedTask) {
@@ -420,9 +455,13 @@ function renderBoardEdges() {
         continue;
       }
 
-      const sharedAnchor = getSharedAnchor(sharedTask, cloud);
-      const cloudAnchor = getCloudAnchor(cloud, sharedTask);
-      const curve = Math.max(110, Math.abs(cloudAnchor.x - sharedAnchor.x) * 0.32);
+      const relationId = makeRelationId(sharedTask.id, cloud.id);
+      const sharedAnchor = getSocketCenter(`.shared-connector-socket[data-relation-id="${relationId}"]`);
+      const cloudAnchor = getSocketCenter(`.cloud-connector-socket[data-relation-id="${relationId}"]`);
+      if (!sharedAnchor || !cloudAnchor) {
+        continue;
+      }
+      const curve = Math.max(90, Math.abs(cloudAnchor.x - sharedAnchor.x) * 0.28);
       const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
       path.setAttribute(
         "d",
@@ -884,35 +923,74 @@ function screenToWorld(clientX, clientY) {
   };
 }
 
-function getSharedAnchor(sharedTask, cloud) {
-  const sharedCenterX = sharedTask.x + SHARED_WIDTH * 0.5;
-  const sharedCenterY = sharedTask.y + SHARED_HEIGHT * 0.5;
-  const cloudCenterX = cloud.x + CLOUD_WIDTH * 0.5;
-  return {
-    x: cloudCenterX >= sharedCenterX ? sharedTask.x + SHARED_WIDTH + 2 : sharedTask.x - 2,
-    y: sharedCenterY,
-  };
-}
-
-function getCloudAnchor(cloud, sharedTask) {
-  const rect = { x: cloud.x + 18, y: cloud.y + 18, width: CLOUD_WIDTH - 36, height: CLOUD_HEIGHT - 18 };
-  const centerX = rect.x + rect.width * 0.5;
-  const centerY = rect.y + rect.height * 0.5;
-  const targetX = sharedTask.x + SHARED_WIDTH * 0.5;
-  const targetY = sharedTask.y + SHARED_HEIGHT * 0.5;
-  const dx = targetX - centerX;
-  const dy = targetY - centerY;
-
-  if (Math.abs(dx) / rect.width > Math.abs(dy) / rect.height) {
-    return {
-      x: dx > 0 ? rect.x + rect.width : rect.x,
-      y: clamp(targetY, rect.y + 22, rect.y + rect.height - 22),
-    };
+function getCloudRelations(cloudId) {
+  const cloud = state.clouds.find((item) => item.id === cloudId);
+  if (!cloud) {
+    return [];
   }
 
+  const centerX = cloud.x + CLOUD_WIDTH * 0.5;
+  const relations = state.sharedTasks
+    .filter((sharedTask) => (sharedTask.cloudIds || []).includes(cloudId))
+    .map((sharedTask) => ({
+      relationId: makeRelationId(sharedTask.id, cloudId),
+      side: sharedTask.x + SHARED_WIDTH * 0.5 < centerX ? "left" : "right",
+      sortY: sharedTask.y + SHARED_HEIGHT * 0.5,
+      type: sharedTask.type || "task",
+    }));
+
+  return sortRelations(relations);
+}
+
+function getSharedRelations(sharedId) {
+  const sharedTask = state.sharedTasks.find((item) => item.id === sharedId);
+  if (!sharedTask) {
+    return [];
+  }
+
+  const centerX = sharedTask.x + SHARED_WIDTH * 0.5;
+  const relations = (sharedTask.cloudIds || [])
+    .map((cloudId) => {
+      const cloud = state.clouds.find((item) => item.id === cloudId);
+      if (!cloud) {
+        return null;
+      }
+      return {
+        relationId: makeRelationId(sharedId, cloudId),
+        side: cloud.x + CLOUD_WIDTH * 0.5 < centerX ? "left" : "right",
+        sortY: cloud.y + CLOUD_HEIGHT * 0.5,
+        type: sharedTask.type || "task",
+      };
+    })
+    .filter(Boolean);
+
+  return sortRelations(relations);
+}
+
+function sortRelations(relations) {
+  return relations.sort((a, b) => {
+    if (a.side !== b.side) {
+      return a.side.localeCompare(b.side);
+    }
+    return a.sortY - b.sortY;
+  });
+}
+
+function makeRelationId(sharedId, cloudId) {
+  return `${sharedId}::${cloudId}`;
+}
+
+function getSocketCenter(selector) {
+  const socket = document.querySelector(selector);
+  if (!socket) {
+    return null;
+  }
+
+  const rect = socket.getBoundingClientRect();
+  const boardRect = elements.board.getBoundingClientRect();
   return {
-    x: clamp(targetX, rect.x + 22, rect.x + rect.width - 22),
-    y: dy > 0 ? rect.y + rect.height : rect.y,
+    x: (rect.left - boardRect.left + rect.width * 0.5) / state.view.scale,
+    y: (rect.top - boardRect.top + rect.height * 0.5) / state.view.scale,
   };
 }
 
