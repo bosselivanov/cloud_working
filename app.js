@@ -1,8 +1,15 @@
-﻿const STORAGE_KEY = "cloud-graph-state-v5";
+﻿const STORAGE_KEY = "cloud-graph-state-v8";
+const CLOUD_WIDTH = 260;
+const CLOUD_HEIGHT = 156;
+const SHARED_WIDTH = 308;
+const SHARED_HEIGHT = 204;
+const TASK_WIDTH = 284;
+const TASK_HEIGHT = 182;
 
 const state = {
   view: { x: 0, y: 0, scale: 1 },
   clouds: [],
+  sharedTasks: [],
   openCloudId: null,
 };
 
@@ -17,26 +24,35 @@ const TASK_TYPE_LABELS = {
 const elements = {
   viewport: document.getElementById("boardViewport"),
   board: document.getElementById("board"),
+  boardEdges: document.getElementById("boardEdges"),
   cloudLayer: document.getElementById("cloudLayer"),
+  sharedLayer: document.getElementById("sharedLayer"),
   cloudTemplate: document.getElementById("cloudTemplate"),
   taskTemplate: document.getElementById("taskTemplate"),
+  sharedTemplate: document.getElementById("sharedTemplate"),
   createCloudBtn: document.getElementById("createCloudBtn"),
+  createSharedBtn: document.getElementById("createSharedBtn"),
   centerViewBtn: document.getElementById("centerViewBtn"),
   studio: document.getElementById("cloudStudio"),
   studioPanel: document.querySelector(".cloud-studio-panel"),
   studioTitle: document.getElementById("studioTitle"),
   closeStudioBtn: document.getElementById("closeStudioBtn"),
   addTaskBtn: document.getElementById("addTaskBtn"),
+  sharedRail: document.getElementById("sharedRail"),
   taskCanvas: document.getElementById("taskCanvas"),
   taskEdges: document.getElementById("taskEdges"),
   taskNodes: document.getElementById("taskNodes"),
 };
 
 let cloudDrag = null;
+let sharedDrag = null;
 let taskDrag = null;
 let panSession = null;
 let spacePressed = false;
 let suppressCloudClickUntil = 0;
+let activeSharedPickerId = null;
+let spotlightSharedId = null;
+let spotlightTimer = null;
 
 bootstrap();
 
@@ -90,6 +106,17 @@ function seedDemo() {
       blobSeed: 0.82,
     }),
   ];
+
+  state.sharedTasks = [
+    createSharedTask({
+      text: "Собрать материалы для экономического списка чтения",
+      x: 620,
+      y: 360,
+      deadline: "2026-07-10",
+      type: "task",
+      cloudIds: [state.clouds[0].id, state.clouds[1].id],
+    }),
+  ];
 }
 
 function createCloudModel({ title, x, y, tasks = [], edges = [], blobSeed = Math.random() }) {
@@ -115,6 +142,18 @@ function createTask(text = "Новая задача", x = 120, y = 90, deadline 
   };
 }
 
+function createSharedTask({ text = "Общая задача", x = 420, y = 280, deadline = "", type = "task", cloudIds = [] } = {}) {
+  return {
+    id: crypto.randomUUID(),
+    text,
+    x,
+    y,
+    deadline,
+    type,
+    cloudIds: [...new Set(cloudIds)],
+  };
+}
+
 function createEdge(from, to) {
   return {
     id: crypto.randomUUID(),
@@ -126,6 +165,12 @@ function createEdge(from, to) {
 function bindGlobalEvents() {
   elements.createCloudBtn.addEventListener("click", () => {
     createCloud();
+    render();
+    saveState();
+  });
+
+  elements.createSharedBtn.addEventListener("click", () => {
+    createSharedOnBoard();
     render();
     saveState();
   });
@@ -161,10 +206,27 @@ function createCloud(x = 240 + state.clouds.length * 52, y = 180 + state.clouds.
   openCloud(cloud.id);
 }
 
+function createSharedOnBoard() {
+  const center = {
+    x: (-state.view.x + elements.viewport.clientWidth * 0.52) / state.view.scale,
+    y: (-state.view.y + elements.viewport.clientHeight * 0.46) / state.view.scale,
+  };
+  state.sharedTasks.push(
+    createSharedTask({
+      text: "Общая задача",
+      x: center.x - SHARED_WIDTH / 2,
+      y: center.y - SHARED_HEIGHT / 2,
+      cloudIds: state.clouds[0] ? [state.clouds[0].id] : [],
+    })
+  );
+}
+
 function render() {
   document.body.classList.toggle("has-open-cloud", Boolean(state.openCloudId));
   renderBoardTransform();
   renderClouds();
+  renderSharedTasks();
+  renderBoardEdges();
   renderStudio();
 }
 
@@ -213,10 +275,174 @@ function renderClouds() {
   }
 }
 
+function renderSharedTasks() {
+  elements.sharedLayer.innerHTML = "";
+
+  for (const sharedTask of state.sharedTasks) {
+    const node = elements.sharedTemplate.content.firstElementChild.cloneNode(true);
+    node.dataset.sharedId = sharedTask.id;
+    node.dataset.taskType = sharedTask.type || "task";
+    node.style.left = `${sharedTask.x}px`;
+    node.style.top = `${sharedTask.y}px`;
+    node.classList.toggle("is-spotlit", spotlightSharedId === sharedTask.id);
+
+    node.querySelector(".shared-type-badge").textContent = "общая";
+    node.querySelector(".shared-text").value = sharedTask.text;
+    node.querySelector(".shared-deadline-input").value = sharedTask.deadline || "";
+    node.querySelector(".shared-type-cycle-btn").textContent = TASK_TYPE_LABELS[sharedTask.type || "task"];
+
+    renderSharedCloudChips(node.querySelector(".shared-clouds"), sharedTask);
+    renderSharedCloudPicker(node.querySelector(".shared-cloud-picker"), sharedTask);
+
+    const interactiveSelector = ".shared-text, .shared-deadline-input, .shared-remove-btn, .shared-picker-toggle-btn, .shared-type-cycle-btn, .shared-chip, .shared-cloud-option";
+    node.addEventListener("pointerdown", (event) => {
+      if (event.target.closest(interactiveSelector) || spacePressed) {
+        return;
+      }
+      sharedDrag = {
+        sharedId: sharedTask.id,
+        startX: event.clientX,
+        startY: event.clientY,
+        originX: sharedTask.x,
+        originY: sharedTask.y,
+        node,
+        moved: false,
+      };
+      node.setPointerCapture(event.pointerId);
+    });
+
+    node.querySelector(".shared-text").addEventListener("input", (event) => {
+      sharedTask.text = event.target.value;
+      saveState();
+      syncStudioSharedRail();
+    });
+
+    node.querySelector(".shared-deadline-input").addEventListener("input", (event) => {
+      sharedTask.deadline = event.target.value;
+      saveState();
+      syncStudioSharedRail();
+    });
+
+    node.querySelector(".shared-type-cycle-btn").addEventListener("click", () => {
+      sharedTask.type = nextTaskType(sharedTask.type);
+      saveState();
+      render();
+    });
+
+    node.querySelector(".shared-picker-toggle-btn").addEventListener("click", () => {
+      activeSharedPickerId = activeSharedPickerId === sharedTask.id ? null : sharedTask.id;
+      renderSharedTasks();
+      renderBoardEdges();
+    });
+
+    node.querySelector(".shared-remove-btn").addEventListener("click", () => {
+      state.sharedTasks = state.sharedTasks.filter((item) => item.id !== sharedTask.id);
+      if (activeSharedPickerId === sharedTask.id) {
+        activeSharedPickerId = null;
+      }
+      saveState();
+      render();
+    });
+
+    elements.sharedLayer.append(node);
+  }
+
+  syncSharedPickerVisibility();
+}
+
+function renderSharedCloudChips(container, sharedTask) {
+  container.innerHTML = "";
+  const cloudIds = sharedTask.cloudIds || [];
+
+  if (cloudIds.length === 0) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "shared-chip shared-chip-empty";
+    chip.textContent = "не привязано";
+    chip.addEventListener("click", () => {
+      activeSharedPickerId = sharedTask.id;
+      renderSharedTasks();
+      renderBoardEdges();
+    });
+    container.append(chip);
+    return;
+  }
+
+  for (const cloudId of cloudIds) {
+    const cloud = state.clouds.find((item) => item.id === cloudId);
+    if (!cloud) {
+      continue;
+    }
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "shared-chip";
+    chip.textContent = cloud.title;
+    chip.addEventListener("click", () => openCloud(cloud.id));
+    container.append(chip);
+  }
+}
+
+function renderSharedCloudPicker(container, sharedTask) {
+  container.innerHTML = "";
+
+  for (const cloud of state.clouds) {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = "shared-cloud-option";
+    option.classList.toggle("is-active", (sharedTask.cloudIds || []).includes(cloud.id));
+    option.textContent = cloud.title;
+    option.addEventListener("click", () => {
+      toggleSharedCloudLink(sharedTask.id, cloud.id);
+    });
+    container.append(option);
+  }
+}
+
+function syncSharedPickerVisibility() {
+  const pickers = elements.sharedLayer.querySelectorAll(".shared-note");
+  for (const pickerHost of pickers) {
+    const sharedId = pickerHost.dataset.sharedId;
+    const picker = pickerHost.querySelector(".shared-cloud-picker");
+    const isActive = activeSharedPickerId === sharedId;
+    picker.hidden = !isActive;
+    pickerHost.classList.toggle("is-expanded", isActive);
+  }
+}
+
+function renderBoardEdges() {
+  elements.boardEdges.innerHTML = "";
+  elements.boardEdges.setAttribute("viewBox", `0 0 ${Math.max(2000, elements.viewport.clientWidth / state.view.scale)} ${Math.max(1600, elements.viewport.clientHeight / state.view.scale)}`);
+
+  for (const sharedTask of state.sharedTasks) {
+    for (const cloudId of sharedTask.cloudIds || []) {
+      const cloud = state.clouds.find((item) => item.id === cloudId);
+      if (!cloud) {
+        continue;
+      }
+
+      const sharedAnchor = getSharedAnchor(sharedTask, cloud);
+      const cloudAnchor = getCloudAnchor(cloud, sharedTask);
+      const curve = Math.max(110, Math.abs(cloudAnchor.x - sharedAnchor.x) * 0.32);
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute(
+        "d",
+        `M ${sharedAnchor.x} ${sharedAnchor.y} C ${sharedAnchor.x + curve} ${sharedAnchor.y}, ${cloudAnchor.x - curve} ${cloudAnchor.y}, ${cloudAnchor.x} ${cloudAnchor.y}`
+      );
+      path.setAttribute("class", `board-edge board-edge--${sharedTask.type || "task"}`);
+      if (spotlightSharedId === sharedTask.id) {
+        path.classList.add("is-spotlit");
+      }
+      elements.boardEdges.append(path);
+    }
+  }
+}
+
 function renderStudio() {
   const cloud = getOpenCloud();
   if (!cloud) {
     elements.studio.hidden = true;
+    elements.sharedRail.hidden = true;
+    elements.sharedRail.innerHTML = "";
     elements.taskEdges.innerHTML = "";
     elements.taskNodes.innerHTML = "";
     return;
@@ -237,7 +463,7 @@ function renderStudio() {
     taskNode.querySelector(".task-text").value = task.text;
     taskNode.querySelector(".deadline-input").value = task.deadline || "";
 
-    const interactiveSelector = ".task-text, .deadline-input, .remove-task-btn, .spawn-task-btn, .type-cycle-btn";
+    const interactiveSelector = ".task-text, .deadline-input, .remove-task-btn, .spawn-task-btn, .type-cycle-btn, .share-task-btn";
     taskNode.addEventListener("pointerdown", (event) => {
       if (event.target.closest(interactiveSelector)) {
         return;
@@ -270,6 +496,10 @@ function renderStudio() {
       renderStudio();
     });
 
+    taskNode.querySelector(".share-task-btn").addEventListener("click", () => {
+      convertTaskToShared(cloud, task.id);
+    });
+
     taskNode.querySelector(".spawn-task-btn").addEventListener("click", () => {
       spawnChildTask(cloud, task);
     });
@@ -285,6 +515,32 @@ function renderStudio() {
   }
 
   renderTaskEdges(cloud);
+  renderSharedRail(cloud);
+}
+
+function renderSharedRail(cloud) {
+  const related = state.sharedTasks.filter((sharedTask) => (sharedTask.cloudIds || []).includes(cloud.id));
+  elements.sharedRail.innerHTML = "";
+  elements.sharedRail.hidden = related.length === 0;
+  if (related.length === 0) {
+    return;
+  }
+
+  for (const sharedTask of related) {
+    const pill = document.createElement("button");
+    pill.type = "button";
+    pill.className = `shared-rail-chip shared-rail-chip--${sharedTask.type || "task"}`;
+    pill.textContent = `${sharedTask.text} · ${Math.max(1, (sharedTask.cloudIds || []).length)} обл.`;
+    pill.addEventListener("click", () => focusSharedTask(sharedTask.id));
+    elements.sharedRail.append(pill);
+  }
+}
+
+function syncStudioSharedRail() {
+  const cloud = getOpenCloud();
+  if (cloud) {
+    renderSharedRail(cloud);
+  }
 }
 
 function renderTaskEdges(cloud) {
@@ -357,6 +613,71 @@ function spawnChildTask(cloud, parentTask) {
   renderStudio();
 }
 
+function convertTaskToShared(cloud, taskId) {
+  const task = cloud.tasks.find((item) => item.id === taskId);
+  if (!task) {
+    return;
+  }
+
+  const sharedPosition = {
+    x: cloud.x + CLOUD_WIDTH + 90 + state.sharedTasks.length * 18,
+    y: cloud.y + 24 + state.sharedTasks.length * 18,
+  };
+
+  const sharedTask = createSharedTask({
+    text: task.text,
+    x: sharedPosition.x,
+    y: sharedPosition.y,
+    deadline: task.deadline,
+    type: task.type,
+    cloudIds: [cloud.id],
+  });
+
+  state.sharedTasks.push(sharedTask);
+  cloud.tasks = cloud.tasks.filter((item) => item.id !== taskId);
+  cloud.edges = (cloud.edges || []).filter((edge) => edge.from !== taskId && edge.to !== taskId);
+  saveState();
+  render();
+}
+
+function toggleSharedCloudLink(sharedId, cloudId) {
+  const sharedTask = state.sharedTasks.find((item) => item.id === sharedId);
+  if (!sharedTask) {
+    return;
+  }
+
+  const links = new Set(sharedTask.cloudIds || []);
+  if (links.has(cloudId)) {
+    links.delete(cloudId);
+  } else {
+    links.add(cloudId);
+  }
+  sharedTask.cloudIds = [...links];
+  saveState();
+  render();
+}
+
+function focusSharedTask(sharedId) {
+  const sharedTask = state.sharedTasks.find((item) => item.id === sharedId);
+  if (!sharedTask) {
+    return;
+  }
+
+  state.openCloudId = null;
+  state.view.scale = 0.94;
+  state.view.x = elements.viewport.clientWidth * 0.5 - (sharedTask.x + SHARED_WIDTH * 0.5) * state.view.scale;
+  state.view.y = elements.viewport.clientHeight * 0.42 - (sharedTask.y + SHARED_HEIGHT * 0.5) * state.view.scale;
+  spotlightSharedId = sharedId;
+  if (spotlightTimer) {
+    window.clearTimeout(spotlightTimer);
+  }
+  spotlightTimer = window.setTimeout(() => {
+    spotlightSharedId = null;
+    render();
+  }, 1400);
+  render();
+}
+
 function handleStudioTitleBlur(event) {
   const cloud = getOpenCloud();
   if (!cloud) {
@@ -366,6 +687,7 @@ function handleStudioTitleBlur(event) {
   cloud.title = event.target.textContent.trim() || "Без названия";
   saveState();
   renderClouds();
+  renderBoardEdges();
 }
 
 function handleZoom(event) {
@@ -391,11 +713,12 @@ function handleZoom(event) {
 function handlePanStart(event) {
   const insideViewport = Boolean(event.target.closest("#boardViewport"));
   const overCloud = Boolean(event.target.closest(".cloud-node"));
+  const overShared = Boolean(event.target.closest(".shared-note"));
   if (state.openCloudId || !insideViewport) {
     return;
   }
 
-  if (!spacePressed && overCloud) {
+  if (!spacePressed && (overCloud || overShared)) {
     return;
   }
 
@@ -435,6 +758,27 @@ function handlePointerMove(event) {
     cloud.y = cloudDrag.originY + deltaY / state.view.scale;
     cloudDrag.node.style.left = `${cloud.x}px`;
     cloudDrag.node.style.top = `${cloud.y}px`;
+    renderBoardEdges();
+    return;
+  }
+
+  if (sharedDrag) {
+    const sharedTask = state.sharedTasks.find((item) => item.id === sharedDrag.sharedId);
+    if (!sharedTask) {
+      return;
+    }
+
+    const deltaX = event.clientX - sharedDrag.startX;
+    const deltaY = event.clientY - sharedDrag.startY;
+    if (!sharedDrag.moved && Math.hypot(deltaX, deltaY) > 4) {
+      sharedDrag.moved = true;
+    }
+
+    sharedTask.x = sharedDrag.originX + deltaX / state.view.scale;
+    sharedTask.y = sharedDrag.originY + deltaY / state.view.scale;
+    sharedDrag.node.style.left = `${sharedTask.x}px`;
+    sharedDrag.node.style.top = `${sharedTask.y}px`;
+    renderBoardEdges();
     return;
   }
 
@@ -455,8 +799,8 @@ function handlePointerMove(event) {
     if (!taskDrag.moved && Math.hypot(deltaX, deltaY) > 4) {
       taskDrag.moved = true;
     }
-    task.x = clamp(taskDrag.originX + deltaX, 14, Math.max(14, canvasRect.width - 254));
-    task.y = clamp(taskDrag.originY + deltaY, 14, Math.max(14, canvasRect.height - 170));
+    task.x = clamp(taskDrag.originX + deltaX, 14, Math.max(14, canvasRect.width - TASK_WIDTH));
+    task.y = clamp(taskDrag.originY + deltaY, 14, Math.max(14, canvasRect.height - TASK_HEIGHT));
     taskDrag.node.style.left = `${task.x}px`;
     taskDrag.node.style.top = `${task.y}px`;
     renderTaskEdges(cloud);
@@ -475,11 +819,12 @@ function handlePointerUp() {
     suppressCloudClickUntil = Date.now() + 220;
   }
 
-  if (cloudDrag || taskDrag) {
+  if (cloudDrag || sharedDrag || taskDrag) {
     saveState();
   }
 
   cloudDrag = null;
+  sharedDrag = null;
   taskDrag = null;
   panSession = null;
 }
@@ -490,6 +835,7 @@ function handleKeyDown(event) {
   }
 
   if (event.key === "Escape") {
+    activeSharedPickerId = null;
     closeStudio();
   }
 }
@@ -535,6 +881,38 @@ function screenToWorld(clientX, clientY) {
   return {
     x: (clientX - rect.left - state.view.x) / state.view.scale,
     y: (clientY - rect.top - state.view.y) / state.view.scale,
+  };
+}
+
+function getSharedAnchor(sharedTask, cloud) {
+  const sharedCenterX = sharedTask.x + SHARED_WIDTH * 0.5;
+  const sharedCenterY = sharedTask.y + SHARED_HEIGHT * 0.5;
+  const cloudCenterX = cloud.x + CLOUD_WIDTH * 0.5;
+  return {
+    x: cloudCenterX >= sharedCenterX ? sharedTask.x + SHARED_WIDTH + 2 : sharedTask.x - 2,
+    y: sharedCenterY,
+  };
+}
+
+function getCloudAnchor(cloud, sharedTask) {
+  const rect = { x: cloud.x + 18, y: cloud.y + 18, width: CLOUD_WIDTH - 36, height: CLOUD_HEIGHT - 18 };
+  const centerX = rect.x + rect.width * 0.5;
+  const centerY = rect.y + rect.height * 0.5;
+  const targetX = sharedTask.x + SHARED_WIDTH * 0.5;
+  const targetY = sharedTask.y + SHARED_HEIGHT * 0.5;
+  const dx = targetX - centerX;
+  const dy = targetY - centerY;
+
+  if (Math.abs(dx) / rect.width > Math.abs(dy) / rect.height) {
+    return {
+      x: dx > 0 ? rect.x + rect.width : rect.x,
+      y: clamp(targetY, rect.y + 22, rect.y + rect.height - 22),
+    };
+  }
+
+  return {
+    x: clamp(targetX, rect.x + 22, rect.x + rect.width - 22),
+    y: dy > 0 ? rect.y + rect.height : rect.y,
   };
 }
 
@@ -584,6 +962,7 @@ function loadState() {
     const parsed = JSON.parse(saved);
     state.view = parsed.view || state.view;
     state.clouds = parsed.clouds || [];
+    state.sharedTasks = parsed.sharedTasks || [];
 
     for (const cloud of state.clouds) {
       if (typeof cloud.blobSeed !== "number") {
@@ -599,6 +978,16 @@ function loadState() {
         type: TASK_TYPES.includes(task.type) ? task.type : "task",
       }));
     }
+
+    state.sharedTasks = state.sharedTasks.map((task) => ({
+      id: task.id || crypto.randomUUID(),
+      text: task.text || "Общая задача",
+      x: typeof task.x === "number" ? task.x : 420,
+      y: typeof task.y === "number" ? task.y : 280,
+      deadline: task.deadline || "",
+      type: TASK_TYPES.includes(task.type) ? task.type : "task",
+      cloudIds: Array.isArray(task.cloudIds) ? [...new Set(task.cloudIds)] : [],
+    }));
   } catch (error) {
     console.warn("Не удалось загрузить состояние:", error);
   }
@@ -610,7 +999,7 @@ function saveState() {
     JSON.stringify({
       view: state.view,
       clouds: state.clouds,
+      sharedTasks: state.sharedTasks,
     })
   );
 }
-

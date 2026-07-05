@@ -4,17 +4,20 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cloud Graph</title>
-  <link rel="stylesheet" href="styles.css?v=7">
+  <link rel="stylesheet" href="styles.css?v=8">
 </head>
 <body>
   <div id="boardViewport" class="board-viewport">
     <div id="board" class="board">
+      <svg id="boardEdges" class="board-edges"></svg>
       <div id="cloudLayer" class="cloud-layer"></div>
+      <div id="sharedLayer" class="shared-layer"></div>
     </div>
   </div>
 
   <div class="floating-dock" aria-label="Инструменты">
     <button id="createCloudBtn" class="dock-button dock-button-primary">+ Облако</button>
+    <button id="createSharedBtn" class="dock-button">+ Общая задача</button>
     <button id="centerViewBtn" class="dock-button">Центр</button>
   </div>
 
@@ -34,10 +37,13 @@
       <div class="studio-meta">
         <span>Перетаскивай узлы внутри облака</span>
         <span>Добавляй подзадачи прямо из узла</span>
+        <span>Выноси общие задачи на главную карту</span>
         <span>Тип узла меняется по кнопке роли</span>
         <span>Колесо: масштаб доски</span>
         <span>Пробел + drag: панорама</span>
       </div>
+
+      <div id="sharedRail" class="shared-rail" hidden></div>
 
       <div id="taskCanvas" class="task-canvas">
         <svg id="taskEdges" class="task-edges"></svg>
@@ -67,6 +73,7 @@
       <div class="task-footer">
         <input class="deadline-input" type="date" aria-label="Дедлайн">
         <div class="task-buttons">
+          <button class="share-task-btn" title="Вынести на карту">↗</button>
           <button class="spawn-task-btn" title="Подзадача">+</button>
           <button class="remove-task-btn" title="Удалить">×</button>
         </div>
@@ -74,7 +81,28 @@
     </article>
   </template>
 
-  <script src="app.js?v=7"></script>
+  <template id="sharedTemplate">
+    <article class="shared-note">
+      <div class="shared-port shared-port-in"></div>
+      <div class="shared-port shared-port-out"></div>
+      <div class="shared-note-head">
+        <span class="shared-type-badge"></span>
+        <button class="shared-picker-toggle-btn" title="Привязать облака">облака</button>
+      </div>
+      <textarea class="shared-text" rows="3" spellcheck="false"></textarea>
+      <div class="shared-clouds"></div>
+      <div class="shared-footer">
+        <input class="shared-deadline-input" type="date" aria-label="Дедлайн общей задачи">
+        <div class="shared-buttons">
+          <button class="shared-type-cycle-btn" title="Сменить роль">роль</button>
+          <button class="shared-remove-btn" title="Удалить">×</button>
+        </div>
+      </div>
+      <div class="shared-cloud-picker" hidden></div>
+    </article>
+  </template>
+
+  <script src="app.js?v=8"></script>
 </body>
 </html>
 
