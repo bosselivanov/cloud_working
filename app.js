@@ -1,4 +1,5 @@
 ﻿const STORAGE_KEY = "cloud-graph-state-v8";
+const STORAGE_SCHEMA_VERSION = "v11";
 const CLOUD_WIDTH = 260;
 const CLOUD_HEIGHT = 156;
 const SHARED_WIDTH = 252;
@@ -114,7 +115,10 @@ function seedDemo() {
       y: 360,
       deadline: "2026-07-10",
       type: "task",
-      cloudIds: [state.clouds[0].id, state.clouds[1].id],
+      links: [
+        { cloudId: state.clouds[0].id, taskId: economicsTasks[1].id },
+        { cloudId: state.clouds[1].id, taskId: booksTasks[0].id },
+      ],
     }),
   ];
 }
@@ -142,7 +146,7 @@ function createTask(text = "Новая задача", x = 120, y = 90, deadline 
   };
 }
 
-function createSharedTask({ text = "Общая задача", x = 420, y = 280, deadline = "", type = "task", cloudIds = [] } = {}) {
+function createSharedTask({ text = "Общая задача", x = 420, y = 280, deadline = "", type = "task", links = [] } = {}) {
   return {
     id: crypto.randomUUID(),
     text,
@@ -150,7 +154,7 @@ function createSharedTask({ text = "Общая задача", x = 420, y = 280, 
     y,
     deadline,
     type,
-    cloudIds: [...new Set(cloudIds)],
+    links: dedupeLinks(links),
   };
 }
 
@@ -216,7 +220,7 @@ function createSharedOnBoard() {
       text: "Общая задача",
       x: center.x - SHARED_WIDTH / 2,
       y: center.y - SHARED_HEIGHT / 2,
-      cloudIds: state.clouds[0] ? [state.clouds[0].id] : [],
+      links: [],
     })
   );
 }
@@ -247,7 +251,7 @@ function renderClouds() {
     node.classList.toggle("is-open", state.openCloudId === cloud.id);
     node.classList.toggle("is-context", Boolean(state.openCloudId) && state.openCloudId !== cloud.id);
     node.querySelector(".cloud-title").textContent = cloud.title;
-    renderCloudConnectors(node, cloud);
+    renderCloudPreview(node.querySelector(".cloud-preview"), cloud);
 
     node.addEventListener("pointerdown", (event) => {
       if (spacePressed) {
@@ -293,8 +297,8 @@ function renderSharedTasks() {
     node.querySelector(".shared-type-cycle-btn").textContent = TASK_TYPE_LABELS[sharedTask.type || "task"];
 
     renderSharedConnectors(node, sharedTask);
-    renderSharedCloudChips(node.querySelector(".shared-clouds"), sharedTask);
-    renderSharedCloudPicker(node.querySelector(".shared-cloud-picker"), sharedTask);
+    renderSharedTaskChips(node.querySelector(".shared-clouds"), sharedTask);
+    renderSharedTaskPicker(node.querySelector(".shared-cloud-picker"), sharedTask);
 
     const interactiveSelector = ".shared-text, .shared-deadline-input, .shared-remove-btn, .shared-picker-toggle-btn, .shared-type-cycle-btn, .shared-chip, .shared-cloud-option";
     node.addEventListener("pointerdown", (event) => {
@@ -352,15 +356,35 @@ function renderSharedTasks() {
   syncSharedPickerVisibility();
 }
 
-function renderCloudConnectors(node, cloud) {
-  const leftContainer = node.querySelector(".cloud-connectors-left");
-  const rightContainer = node.querySelector(".cloud-connectors-right");
-  leftContainer.innerHTML = "";
-  rightContainer.innerHTML = "";
+function renderCloudPreview(container, cloud) {
+  container.innerHTML = "";
+  const previewWidth = 300;
+  const previewHeight = 160;
 
-  const relations = getCloudRelations(cloud.id);
-  appendConnectorSockets(leftContainer, relations.filter((relation) => relation.side === "left"), "cloud", cloud.id);
-  appendConnectorSockets(rightContainer, relations.filter((relation) => relation.side === "right"), "cloud", cloud.id);
+  for (const task of cloud.tasks) {
+    const preview = document.createElement("div");
+    preview.className = "cloud-preview-task";
+    preview.dataset.taskId = task.id;
+    preview.dataset.cloudId = cloud.id;
+    preview.dataset.taskType = task.type || "task";
+    preview.classList.toggle("is-linked", isTaskLinkedToWorld(cloud.id, task.id));
+    preview.style.left = `${clamp(16 + task.x * 0.28, 12, previewWidth - 140)}px`;
+    preview.style.top = `${clamp(14 + task.y * 0.2, 12, previewHeight - 58)}px`;
+
+    const label = document.createElement("span");
+    label.className = "cloud-preview-label";
+    label.textContent = task.text;
+    preview.append(label);
+
+    if (isTaskLinkedToWorld(cloud.id, task.id)) {
+      const port = document.createElement("div");
+      port.className = "preview-world-port";
+      port.dataset.relationIds = getTaskRelationIds(cloud.id, task.id).join("|");
+      preview.append(port);
+    }
+
+    container.append(preview);
+  }
 }
 
 function renderSharedConnectors(node, sharedTask) {
@@ -385,11 +409,11 @@ function appendConnectorSockets(container, relations, kind, ownerId) {
   }
 }
 
-function renderSharedCloudChips(container, sharedTask) {
+function renderSharedTaskChips(container, sharedTask) {
   container.innerHTML = "";
-  const cloudIds = sharedTask.cloudIds || [];
+  const links = sharedTask.links || [];
 
-  if (cloudIds.length === 0) {
+  if (links.length === 0) {
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "shared-chip shared-chip-empty";
@@ -403,33 +427,35 @@ function renderSharedCloudChips(container, sharedTask) {
     return;
   }
 
-  for (const cloudId of cloudIds) {
-    const cloud = state.clouds.find((item) => item.id === cloudId);
-    if (!cloud) {
+  for (const link of links) {
+    const task = getLinkedTask(link);
+    if (!task) {
       continue;
     }
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "shared-chip";
-    chip.textContent = cloud.title;
-    chip.addEventListener("click", () => openCloud(cloud.id));
+    chip.textContent = `${task.cloud.title} · ${task.task.text}`;
+    chip.addEventListener("click", () => openCloud(task.cloud.id));
     container.append(chip);
   }
 }
 
-function renderSharedCloudPicker(container, sharedTask) {
+function renderSharedTaskPicker(container, sharedTask) {
   container.innerHTML = "";
 
   for (const cloud of state.clouds) {
-    const option = document.createElement("button");
-    option.type = "button";
-    option.className = "shared-cloud-option";
-    option.classList.toggle("is-active", (sharedTask.cloudIds || []).includes(cloud.id));
-    option.textContent = cloud.title;
-    option.addEventListener("click", () => {
-      toggleSharedCloudLink(sharedTask.id, cloud.id);
-    });
-    container.append(option);
+    for (const task of cloud.tasks) {
+      const option = document.createElement("button");
+      option.type = "button";
+      option.className = "shared-cloud-option";
+      option.classList.toggle("is-active", hasSharedTaskLink(sharedTask, cloud.id, task.id));
+      option.textContent = `${cloud.title} · ${task.text}`;
+      option.addEventListener("click", () => {
+        toggleSharedTaskLink(sharedTask.id, cloud.id, task.id);
+      });
+      container.append(option);
+    }
   }
 }
 
@@ -449,19 +475,14 @@ function renderBoardEdges() {
   elements.boardEdges.setAttribute("viewBox", `0 0 ${Math.max(2000, elements.viewport.clientWidth / state.view.scale)} ${Math.max(1600, elements.viewport.clientHeight / state.view.scale)}`);
 
   for (const sharedTask of state.sharedTasks) {
-    for (const cloudId of sharedTask.cloudIds || []) {
-      const cloud = state.clouds.find((item) => item.id === cloudId);
-      if (!cloud) {
-        continue;
-      }
-
-      const relationId = makeRelationId(sharedTask.id, cloud.id);
+    for (const link of sharedTask.links || []) {
+      const relationId = makeRelationId(sharedTask.id, link.cloudId, link.taskId);
       const sharedAnchor = getSocketCenter(`.shared-connector-socket[data-relation-id="${relationId}"]`);
-      const cloudAnchor = getSocketCenter(`.cloud-connector-socket[data-relation-id="${relationId}"]`);
+      const cloudAnchor = getSocketCenter(`.preview-world-port[data-relation-ids*="${relationId}"]`);
       if (!sharedAnchor || !cloudAnchor) {
         continue;
       }
-      const curve = Math.max(90, Math.abs(cloudAnchor.x - sharedAnchor.x) * 0.28);
+      const curve = Math.max(86, Math.abs(cloudAnchor.x - sharedAnchor.x) * 0.24);
       const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
       path.setAttribute(
         "d",
@@ -558,7 +579,7 @@ function renderStudio() {
 }
 
 function renderSharedRail(cloud) {
-  const related = state.sharedTasks.filter((sharedTask) => (sharedTask.cloudIds || []).includes(cloud.id));
+  const related = state.sharedTasks.filter((sharedTask) => (sharedTask.links || []).some((link) => link.cloudId === cloud.id));
   elements.sharedRail.innerHTML = "";
   elements.sharedRail.hidden = related.length === 0;
   if (related.length === 0) {
@@ -569,7 +590,7 @@ function renderSharedRail(cloud) {
     const pill = document.createElement("button");
     pill.type = "button";
     pill.className = `shared-rail-chip shared-rail-chip--${sharedTask.type || "task"}`;
-    pill.textContent = `${sharedTask.text} · ${Math.max(1, (sharedTask.cloudIds || []).length)} обл.`;
+    pill.textContent = `${sharedTask.text} · ${Math.max(1, (sharedTask.links || []).length)} связ.`;
     pill.addEventListener("click", () => focusSharedTask(sharedTask.id));
     elements.sharedRail.append(pill);
   }
@@ -669,29 +690,27 @@ function convertTaskToShared(cloud, taskId) {
     y: sharedPosition.y,
     deadline: task.deadline,
     type: task.type,
-    cloudIds: [cloud.id],
+    links: [{ cloudId: cloud.id, taskId: task.id }],
   });
 
   state.sharedTasks.push(sharedTask);
-  cloud.tasks = cloud.tasks.filter((item) => item.id !== taskId);
-  cloud.edges = (cloud.edges || []).filter((edge) => edge.from !== taskId && edge.to !== taskId);
   saveState();
   render();
 }
 
-function toggleSharedCloudLink(sharedId, cloudId) {
+function toggleSharedTaskLink(sharedId, cloudId, taskId) {
   const sharedTask = state.sharedTasks.find((item) => item.id === sharedId);
   if (!sharedTask) {
     return;
   }
 
-  const links = new Set(sharedTask.cloudIds || []);
-  if (links.has(cloudId)) {
-    links.delete(cloudId);
+  const current = sharedTask.links || [];
+  const exists = current.some((link) => link.cloudId === cloudId && link.taskId === taskId);
+  if (exists) {
+    sharedTask.links = current.filter((link) => !(link.cloudId === cloudId && link.taskId === taskId));
   } else {
-    links.add(cloudId);
+    sharedTask.links = dedupeLinks([...current, { cloudId, taskId }]);
   }
-  sharedTask.cloudIds = [...links];
   saveState();
   render();
 }
@@ -924,22 +943,7 @@ function screenToWorld(clientX, clientY) {
 }
 
 function getCloudRelations(cloudId) {
-  const cloud = state.clouds.find((item) => item.id === cloudId);
-  if (!cloud) {
-    return [];
-  }
-
-  const centerX = cloud.x + CLOUD_WIDTH * 0.5;
-  const relations = state.sharedTasks
-    .filter((sharedTask) => (sharedTask.cloudIds || []).includes(cloudId))
-    .map((sharedTask) => ({
-      relationId: makeRelationId(sharedTask.id, cloudId),
-      side: sharedTask.x + SHARED_WIDTH * 0.5 < centerX ? "left" : "right",
-      sortY: sharedTask.y + SHARED_HEIGHT * 0.5,
-      type: sharedTask.type || "task",
-    }));
-
-  return sortRelations(relations);
+  return [];
 }
 
 function getSharedRelations(sharedId) {
@@ -949,16 +953,17 @@ function getSharedRelations(sharedId) {
   }
 
   const centerX = sharedTask.x + SHARED_WIDTH * 0.5;
-  const relations = (sharedTask.cloudIds || [])
-    .map((cloudId) => {
-      const cloud = state.clouds.find((item) => item.id === cloudId);
-      if (!cloud) {
+  const relations = (sharedTask.links || [])
+    .map((link) => {
+      const cloud = state.clouds.find((item) => item.id === link.cloudId);
+      const task = cloud?.tasks.find((item) => item.id === link.taskId);
+      if (!cloud || !task) {
         return null;
       }
       return {
-        relationId: makeRelationId(sharedId, cloudId),
+        relationId: makeRelationId(sharedId, link.cloudId, link.taskId),
         side: cloud.x + CLOUD_WIDTH * 0.5 < centerX ? "left" : "right",
-        sortY: cloud.y + CLOUD_HEIGHT * 0.5,
+        sortY: cloud.y + task.y * 0.14,
         type: sharedTask.type || "task",
       };
     })
@@ -976,8 +981,8 @@ function sortRelations(relations) {
   });
 }
 
-function makeRelationId(sharedId, cloudId) {
-  return `${sharedId}::${cloudId}`;
+function makeRelationId(sharedId, cloudId, taskId) {
+  return `${sharedId}::${cloudId}::${taskId}`;
 }
 
 function getSocketCenter(selector) {
@@ -992,6 +997,67 @@ function getSocketCenter(selector) {
     x: (rect.left - boardRect.left + rect.width * 0.5) / state.view.scale,
     y: (rect.top - boardRect.top + rect.height * 0.5) / state.view.scale,
   };
+}
+
+function dedupeLinks(links) {
+  const seen = new Set();
+  return (links || []).filter((link) => {
+    if (!link?.cloudId || !link?.taskId) {
+      return false;
+    }
+    const key = `${link.cloudId}::${link.taskId}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+function hasSharedTaskLink(sharedTask, cloudId, taskId) {
+  return (sharedTask.links || []).some((link) => link.cloudId === cloudId && link.taskId === taskId);
+}
+
+function getLinkedTask(link) {
+  const cloud = state.clouds.find((item) => item.id === link.cloudId);
+  const task = cloud?.tasks.find((item) => item.id === link.taskId);
+  if (!cloud || !task) {
+    return null;
+  }
+  return { cloud, task };
+}
+
+function isTaskLinkedToWorld(cloudId, taskId) {
+  return state.sharedTasks.some((sharedTask) => hasSharedTaskLink(sharedTask, cloudId, taskId));
+}
+
+function getTaskRelationIds(cloudId, taskId) {
+  return state.sharedTasks
+    .filter((sharedTask) => hasSharedTaskLink(sharedTask, cloudId, taskId))
+    .map((sharedTask) => makeRelationId(sharedTask.id, cloudId, taskId));
+}
+
+function normalizeSharedLinks(task) {
+  if (Array.isArray(task.links)) {
+    return dedupeLinks(task.links);
+  }
+
+  if (Array.isArray(task.cloudIds)) {
+    return dedupeLinks(
+      task.cloudIds
+        .map((cloudId) => {
+          const cloud = state.clouds.find((item) => item.id === cloudId);
+          const fallbackTask = cloud?.tasks?.[0];
+          if (!fallbackTask) {
+            return null;
+          }
+          return { cloudId, taskId: fallbackTask.id };
+        })
+        .filter(Boolean)
+    );
+  }
+
+  return [];
 }
 
 function getBlobRadius(seed) {
@@ -1064,7 +1130,7 @@ function loadState() {
       y: typeof task.y === "number" ? task.y : 280,
       deadline: task.deadline || "",
       type: TASK_TYPES.includes(task.type) ? task.type : "task",
-      cloudIds: Array.isArray(task.cloudIds) ? [...new Set(task.cloudIds)] : [],
+      links: normalizeSharedLinks(task),
     }));
   } catch (error) {
     console.warn("Не удалось загрузить состояние:", error);
