@@ -331,6 +331,7 @@ body.has-open-cloud .floating-dock {
   grid-template-rows: auto auto 1fr auto;
   gap: 10px;
   cursor: grab;
+  overflow: visible;
 }
 
 .task-note:active {
@@ -388,6 +389,7 @@ body.has-open-cloud .floating-dock {
   background: rgba(22, 22, 22, 0.06);
   color: var(--muted);
   flex-shrink: 0;
+  border: 1px solid currentColor;
 }
 
 .task-grip {
@@ -450,23 +452,28 @@ body.has-open-cloud .floating-dock {
   border-color: rgba(63, 127, 187, 0.22);
   box-shadow: 0 12px 36px rgba(63, 127, 187, 0.08);
   color: var(--idea);
+  border-radius: 34px 34px 28px 28px / 28px 28px 34px 34px;
 }
 
 .task-note[data-task-type="task"] {
   border-color: rgba(184, 146, 69, 0.2);
   color: var(--task);
+  border-radius: 20px;
 }
 
 .task-note[data-task-type="decision"] {
   border-color: rgba(43, 154, 107, 0.22);
   box-shadow: 0 12px 36px rgba(43, 154, 107, 0.08);
   color: var(--decision);
+  border-radius: 18px 42px 18px 42px;
 }
 
 .task-note[data-task-type="risk"] {
   border-color: rgba(191, 95, 69, 0.24);
   box-shadow: 0 12px 36px rgba(191, 95, 69, 0.08);
   color: var(--risk);
+  border-radius: 24px 24px 24px 52px;
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%);
 }
 
 .task-note[data-task-type="idea"] .task-type-badge,
@@ -507,6 +514,68 @@ body.has-open-cloud .floating-dock {
 .task-note[data-task-type="risk"] .task-port,
 .task-note[data-task-type="risk"] .task-type-badge {
   color: var(--risk);
+}
+
+.task-note[data-task-type="idea"] .task-grip {
+  width: 62px;
+  border-radius: 999px;
+}
+
+.task-note[data-task-type="task"] .task-grip {
+  width: 54px;
+  border-radius: 999px;
+}
+
+.task-note[data-task-type="decision"] .task-grip {
+  width: 72px;
+  border-radius: 10px;
+}
+
+.task-note[data-task-type="risk"] .task-grip {
+  width: 64px;
+  border-radius: 999px;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(191, 95, 69, 0.18) 0 10px,
+    rgba(191, 95, 69, 0.34) 10px 20px
+  );
+}
+
+.task-note[data-task-type="idea"]::after,
+.task-note[data-task-type="decision"]::after,
+.task-note[data-task-type="risk"]::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.task-note[data-task-type="idea"]::after {
+  top: 18px;
+  right: 18px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(63, 127, 187, 0.18);
+  box-shadow: 0 0 0 6px rgba(63, 127, 187, 0.06);
+}
+
+.task-note[data-task-type="decision"]::after {
+  right: 16px;
+  bottom: 16px;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 2px solid rgba(43, 154, 107, 0.3);
+  transform: rotate(45deg);
+}
+
+.task-note[data-task-type="risk"]::after {
+  top: 12px;
+  right: 14px;
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-top: 10px solid rgba(191, 95, 69, 0.32);
 }
 
 .task-note .task-text,

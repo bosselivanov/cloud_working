@@ -233,10 +233,11 @@ function renderStudio() {
     taskNode.style.left = `${task.x}px`;
     taskNode.style.top = `${task.y}px`;
     taskNode.querySelector(".task-type-badge").textContent = TASK_TYPE_LABELS[task.type || "task"];
+    taskNode.querySelector(".type-cycle-btn").textContent = TASK_TYPE_LABELS[task.type || "task"];
     taskNode.querySelector(".task-text").value = task.text;
     taskNode.querySelector(".deadline-input").value = task.deadline || "";
 
-    const interactiveSelector = ".task-text, .deadline-input, .remove-task-btn, .spawn-task-btn";
+    const interactiveSelector = ".task-text, .deadline-input, .remove-task-btn, .spawn-task-btn, .type-cycle-btn";
     taskNode.addEventListener("pointerdown", (event) => {
       if (event.target.closest(interactiveSelector)) {
         return;
