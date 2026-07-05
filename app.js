@@ -1,8 +1,8 @@
 ﻿const STORAGE_KEY = "cloud-graph-state-v8";
 const CLOUD_WIDTH = 260;
 const CLOUD_HEIGHT = 156;
-const SHARED_WIDTH = 308;
-const SHARED_HEIGHT = 204;
+const SHARED_WIDTH = 252;
+const SHARED_HEIGHT = 176;
 const TASK_WIDTH = 284;
 const TASK_HEIGHT = 182;
 

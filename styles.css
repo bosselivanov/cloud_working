@@ -75,6 +75,7 @@ textarea {
 
 .shared-layer {
   z-index: 2;
+  pointer-events: none;
 }
 
 .floating-dock {
@@ -544,8 +545,8 @@ body.has-open-cloud .floating-dock {
 
 .shared-note {
   position: absolute;
-  width: 308px;
-  min-height: 204px;
+  width: 252px;
+  min-height: 176px;
   padding: 16px;
   border-radius: 28px;
   border: 1px solid rgba(184, 146, 69, 0.16);
@@ -559,6 +560,7 @@ body.has-open-cloud .floating-dock {
   grid-template-rows: auto 1fr auto auto;
   gap: 12px;
   cursor: grab;
+  pointer-events: auto;
 }
 
 .shared-note:active {
@@ -627,7 +629,7 @@ body.has-open-cloud .floating-dock {
 
 .shared-text {
   width: 100%;
-  min-height: 74px;
+  min-height: 58px;
   resize: none;
   border: 0;
   background: transparent;
@@ -891,7 +893,7 @@ body.has-open-cloud .floating-dock {
   }
 
   .shared-note {
-    width: 276px;
+    width: 236px;
   }
 
   .floating-dock {
