@@ -318,6 +318,10 @@ function renderSharedTasks() {
 
 function renderCloudPreview(container, cloud) {
   container.innerHTML = "";
+  container.hidden = cloud.tasks.length === 0;
+  if (cloud.tasks.length === 0) {
+    return;
+  }
   const previewWidth = 300;
   const previewHeight = 160;
 
@@ -465,7 +469,9 @@ function renderBoardEdges() {
     for (const link of sharedTask.links || []) {
       const relationId = makeRelationId(sharedTask.id, link.cloudId, link.taskId);
       const sharedAnchor = getSocketMeta(`.shared-connector-socket[data-relation-id="${relationId}"]`);
-      const cloudAnchor = getSocketMeta(`.preview-world-port[data-relation-id="${relationId}"]`);
+      const cloudAnchor =
+        getSocketMeta(`.preview-world-port[data-relation-id="${relationId}"]`) ||
+        getCloudCenterMeta(link.cloudId);
       if (!sharedAnchor || !cloudAnchor) {
         continue;
       }
@@ -647,9 +653,11 @@ function addTaskToOpenCloud() {
   }
 
   const offset = cloud.tasks.length * 26;
-  cloud.tasks.push(createTask("", 90 + offset, 90 + offset, ""));
+  const task = createTask("", 90 + offset, 90 + offset, "");
+  cloud.tasks.push(task);
   saveState();
-  renderStudio();
+  render();
+  focusTaskEditor(task.id);
 }
 
 function spawnChildTask(cloud, parentTask) {
@@ -658,7 +666,8 @@ function spawnChildTask(cloud, parentTask) {
   cloud.edges = cloud.edges || [];
   cloud.edges.push(createEdge(parentTask.id, child.id));
   saveState();
-  renderStudio();
+  render();
+  focusTaskEditor(child.id);
 }
 
 function convertTaskToShared(cloud, taskId) {
@@ -1008,6 +1017,21 @@ function getSocketMeta(selector) {
   };
 }
 
+function getCloudCenterMeta(cloudId) {
+  const cloudNode = document.querySelector(`.cloud-node[data-cloud-id="${cloudId}"] .cloud-shell`);
+  if (!cloudNode) {
+    return null;
+  }
+
+  const rect = cloudNode.getBoundingClientRect();
+  const boardRect = elements.board.getBoundingClientRect();
+  return {
+    x: (rect.left - boardRect.left + rect.width * 0.5) / state.view.scale,
+    y: (rect.top - boardRect.top + rect.height * 0.5) / state.view.scale,
+    side: "right",
+  };
+}
+
 function dedupeLinks(links) {
   const seen = new Set();
   return (links || []).filter((link) => {
@@ -1081,6 +1105,17 @@ function buildOrthogonalPath(start, end, offset = 24) {
     `L ${x2} ${end.y}`,
     `L ${end.x} ${end.y}`,
   ].join(" ");
+}
+
+function focusTaskEditor(taskId) {
+  requestAnimationFrame(() => {
+    const node = elements.taskNodes.querySelector(`[data-task-id="${taskId}"] .task-text`);
+    if (!node) {
+      return;
+    }
+    node.focus();
+    node.setSelectionRange(0, node.value.length);
+  });
 }
 
 function normalizeSharedLinks(task) {
