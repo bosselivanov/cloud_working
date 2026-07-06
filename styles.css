@@ -315,7 +315,20 @@ textarea {
 .cloud-head {
   display: flex;
   align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   min-width: 0;
+}
+
+.cloud-remove-btn {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(22, 22, 22, 0.08);
+  color: rgba(22, 22, 22, 0.62);
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
 .cloud-preview {
@@ -892,9 +905,20 @@ body.has-open-cloud .floating-dock {
 
 .shared-cloud-picker {
   display: flex;
+  flex-direction: column;
   gap: 8px;
-  flex-wrap: wrap;
   padding-top: 2px;
+}
+
+.shared-picker-clouds,
+.shared-picker-tasks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.shared-cloud-option-cloud {
+  font-weight: 600;
 }
 
 .shared-cloud-option.is-active {

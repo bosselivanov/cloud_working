@@ -58,6 +58,7 @@ let panSession = null;
 let spacePressed = false;
 let suppressCloudClickUntil = 0;
 let activeSharedPickerId = null;
+let activeSharedPickerCloudId = null;
 let spotlightSharedId = null;
 let spotlightTimer = null;
 
@@ -205,6 +206,10 @@ function renderClouds() {
     node.classList.toggle("is-context", Boolean(state.openCloudId) && state.openCloudId !== cloud.id);
     node.querySelector(".cloud-title").textContent = cloud.title;
     renderCloudPreview(node.querySelector(".cloud-preview"), cloud);
+    node.querySelector(".cloud-remove-btn").addEventListener("click", (event) => {
+      event.stopPropagation();
+      removeCloud(cloud.id);
+    });
 
     node.addEventListener("pointerdown", (event) => {
       if (spacePressed) {
@@ -290,6 +295,7 @@ function renderSharedTasks() {
 
     node.querySelector(".shared-picker-toggle-btn").addEventListener("click", () => {
       activeSharedPickerId = activeSharedPickerId === sharedTask.id ? null : sharedTask.id;
+      activeSharedPickerCloudId = activeSharedPickerId ? getInitialPickerCloudId(sharedTask) : null;
       renderSharedTasks();
       renderBoardEdges();
     });
@@ -298,6 +304,7 @@ function renderSharedTasks() {
       state.sharedTasks = state.sharedTasks.filter((item) => item.id !== sharedTask.id);
       if (activeSharedPickerId === sharedTask.id) {
         activeSharedPickerId = null;
+        activeSharedPickerCloudId = null;
       }
       saveState();
       render();
@@ -399,19 +406,43 @@ function renderSharedTaskChips(container, sharedTask) {
 
 function renderSharedTaskPicker(container, sharedTask) {
   container.innerHTML = "";
+  const cloudRow = document.createElement("div");
+  cloudRow.className = "shared-picker-clouds";
+  container.append(cloudRow);
 
   for (const cloud of state.clouds) {
-    for (const task of cloud.tasks) {
-      const option = document.createElement("button");
-      option.type = "button";
-      option.className = "shared-cloud-option";
-      option.classList.toggle("is-active", hasSharedTaskLink(sharedTask, cloud.id, task.id));
-      option.textContent = `${cloud.title} · ${task.text}`;
-      option.addEventListener("click", () => {
-        toggleSharedTaskLink(sharedTask.id, cloud.id, task.id);
-      });
-      container.append(option);
-    }
+    const cloudButton = document.createElement("button");
+    cloudButton.type = "button";
+    cloudButton.className = "shared-cloud-option shared-cloud-option-cloud";
+    cloudButton.classList.toggle("is-active", activeSharedPickerCloudId === cloud.id);
+    const linkedCount = (sharedTask.links || []).filter((link) => link.cloudId === cloud.id).length;
+    cloudButton.textContent = linkedCount > 0 ? `${cloud.title} · ${linkedCount}` : cloud.title;
+    cloudButton.addEventListener("click", () => {
+      activeSharedPickerCloudId = cloud.id;
+      renderSharedTasks();
+    });
+    cloudRow.append(cloudButton);
+  }
+
+  const chosenCloud = state.clouds.find((cloud) => cloud.id === activeSharedPickerCloudId) || state.clouds[0];
+  if (!chosenCloud) {
+    return;
+  }
+
+  const taskRow = document.createElement("div");
+  taskRow.className = "shared-picker-tasks";
+  container.append(taskRow);
+
+  for (const task of chosenCloud.tasks) {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = "shared-cloud-option";
+    option.classList.toggle("is-active", hasSharedTaskLink(sharedTask, chosenCloud.id, task.id));
+    option.textContent = task.text || "без названия";
+    option.addEventListener("click", () => {
+      toggleSharedTaskLink(sharedTask.id, chosenCloud.id, task.id);
+    });
+    taskRow.append(option);
   }
 }
 
@@ -668,6 +699,26 @@ function toggleSharedTaskLink(sharedId, cloudId, taskId) {
   } else {
     sharedTask.links = dedupeLinks([...current, { cloudId, taskId }]);
   }
+  saveState();
+  render();
+}
+
+function removeCloud(cloudId) {
+  state.clouds = state.clouds.filter((cloud) => cloud.id !== cloudId);
+  state.sharedTasks = state.sharedTasks
+    .map((sharedTask) => ({
+      ...sharedTask,
+      links: (sharedTask.links || []).filter((link) => link.cloudId !== cloudId),
+    }))
+    .filter((sharedTask) => Boolean(sharedTask.text?.trim()) || (sharedTask.links || []).length > 0);
+
+  if (state.openCloudId === cloudId) {
+    state.openCloudId = null;
+  }
+  if (activeSharedPickerCloudId === cloudId) {
+    activeSharedPickerCloudId = state.clouds[0]?.id || null;
+  }
+
   saveState();
   render();
 }
@@ -983,6 +1034,10 @@ function getLinkedTask(link) {
     return null;
   }
   return { cloud, task };
+}
+
+function getInitialPickerCloudId(sharedTask) {
+  return sharedTask.links?.[0]?.cloudId || state.clouds[0]?.id || null;
 }
 
 function isTaskLinkedToWorld(cloudId, taskId) {
