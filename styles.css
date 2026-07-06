@@ -377,7 +377,6 @@ textarea {
 .preview-world-port {
   position: absolute;
   top: 50%;
-  right: -9px;
   width: 16px;
   height: 16px;
   border-radius: 999px;
@@ -385,6 +384,14 @@ textarea {
   background: rgba(255, 255, 255, 0.96);
   border: 3px solid rgba(184, 146, 69, 0.54);
   box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.72);
+}
+
+.preview-world-port-right {
+  right: -9px;
+}
+
+.preview-world-port-left {
+  left: -9px;
 }
 
 .cloud-preview-task[data-task-type="idea"] .preview-world-port {

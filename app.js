@@ -329,10 +329,12 @@ function renderCloudPreview(container, cloud) {
     label.textContent = task.text;
     preview.append(label);
 
-    if (isTaskLinkedToWorld(cloud.id, task.id)) {
+    const relations = getTaskWorldRelations(cloud.id, task.id);
+    for (const relation of relations) {
       const port = document.createElement("div");
-      port.className = "preview-world-port";
-      port.dataset.relationIds = getTaskRelationIds(cloud.id, task.id).join("|");
+      port.className = `preview-world-port preview-world-port-${relation.side}`;
+      port.dataset.relationId = relation.relationId;
+      port.dataset.side = relation.side;
       preview.append(port);
     }
 
@@ -358,6 +360,7 @@ function appendConnectorSockets(container, relations, kind, ownerId) {
     socket.dataset.relationId = relation.relationId;
     socket.dataset.ownerId = ownerId;
     socket.dataset.taskType = relation.type || "task";
+    socket.dataset.side = relation.side;
     container.append(socket);
   }
 }
@@ -430,17 +433,13 @@ function renderBoardEdges() {
   for (const sharedTask of state.sharedTasks) {
     for (const link of sharedTask.links || []) {
       const relationId = makeRelationId(sharedTask.id, link.cloudId, link.taskId);
-      const sharedAnchor = getSocketCenter(`.shared-connector-socket[data-relation-id="${relationId}"]`);
-      const cloudAnchor = getSocketCenter(`.preview-world-port[data-relation-ids*="${relationId}"]`);
+      const sharedAnchor = getSocketMeta(`.shared-connector-socket[data-relation-id="${relationId}"]`);
+      const cloudAnchor = getSocketMeta(`.preview-world-port[data-relation-id="${relationId}"]`);
       if (!sharedAnchor || !cloudAnchor) {
         continue;
       }
-      const curve = Math.max(86, Math.abs(cloudAnchor.x - sharedAnchor.x) * 0.24);
       const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      path.setAttribute(
-        "d",
-        `M ${sharedAnchor.x} ${sharedAnchor.y} C ${sharedAnchor.x + curve} ${sharedAnchor.y}, ${cloudAnchor.x - curve} ${cloudAnchor.y}, ${cloudAnchor.x} ${cloudAnchor.y}`
-      );
+      path.setAttribute("d", buildOrthogonalPath(sharedAnchor, cloudAnchor, 28));
       path.setAttribute("class", `board-edge board-edge--${sharedTask.type || "task"}`);
       if (spotlightSharedId === sharedTask.id) {
         path.classList.add("is-spotlit");
@@ -582,13 +581,18 @@ function renderTaskEdges(cloud) {
 
     const startRect = startPort.getBoundingClientRect();
     const endRect = endPort.getBoundingClientRect();
-    const startX = startRect.left - canvasRect.left + startRect.width / 2;
-    const startY = startRect.top - canvasRect.top + startRect.height / 2;
-    const endX = endRect.left - canvasRect.left + endRect.width / 2;
-    const endY = endRect.top - canvasRect.top + endRect.height / 2;
-    const curve = Math.max(80, Math.abs(endX - startX) * 0.35);
+    const startMeta = {
+      x: startRect.left - canvasRect.left + startRect.width / 2,
+      y: startRect.top - canvasRect.top + startRect.height / 2,
+      side: "right",
+    };
+    const endMeta = {
+      x: endRect.left - canvasRect.left + endRect.width / 2,
+      y: endRect.top - canvasRect.top + endRect.height / 2,
+      side: "left",
+    };
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("d", `M ${startX} ${startY} C ${startX + curve} ${startY}, ${endX - curve} ${endY}, ${endX} ${endY}`);
+    path.setAttribute("d", buildOrthogonalPath(startMeta, endMeta, 24));
     path.setAttribute("class", `task-edge task-edge--${to.type || from.type || "task"}`);
     elements.taskEdges.append(path);
   }
@@ -938,7 +942,7 @@ function makeRelationId(sharedId, cloudId, taskId) {
   return `${sharedId}::${cloudId}::${taskId}`;
 }
 
-function getSocketCenter(selector) {
+function getSocketMeta(selector) {
   const socket = document.querySelector(selector);
   if (!socket) {
     return null;
@@ -949,6 +953,7 @@ function getSocketCenter(selector) {
   return {
     x: (rect.left - boardRect.left + rect.width * 0.5) / state.view.scale,
     y: (rect.top - boardRect.top + rect.height * 0.5) / state.view.scale,
+    side: socket.dataset.side || "right",
   };
 }
 
@@ -988,6 +993,39 @@ function getTaskRelationIds(cloudId, taskId) {
   return state.sharedTasks
     .filter((sharedTask) => hasSharedTaskLink(sharedTask, cloudId, taskId))
     .map((sharedTask) => makeRelationId(sharedTask.id, cloudId, taskId));
+}
+
+function getTaskWorldRelations(cloudId, taskId) {
+  const cloud = state.clouds.find((item) => item.id === cloudId);
+  const task = cloud?.tasks.find((item) => item.id === taskId);
+  if (!cloud || !task) {
+    return [];
+  }
+
+  return state.sharedTasks
+    .filter((sharedTask) => hasSharedTaskLink(sharedTask, cloudId, taskId))
+    .map((sharedTask) => ({
+      relationId: makeRelationId(sharedTask.id, cloudId, taskId),
+      side: sharedTask.x + SHARED_WIDTH * 0.5 < cloud.x + task.x ? "left" : "right",
+      type: sharedTask.type || "task",
+    }));
+}
+
+function buildOrthogonalPath(start, end, offset = 24) {
+  const startLead = start.side === "left" ? -offset : offset;
+  const endLead = end.side === "left" ? -offset : offset;
+  const x1 = start.x + startLead;
+  const x2 = end.x + endLead;
+  const midX = (x1 + x2) / 2;
+
+  return [
+    `M ${start.x} ${start.y}`,
+    `L ${x1} ${start.y}`,
+    `L ${midX} ${start.y}`,
+    `L ${midX} ${end.y}`,
+    `L ${x2} ${end.y}`,
+    `L ${end.x} ${end.y}`,
+  ].join(" ");
 }
 
 function normalizeSharedLinks(task) {
