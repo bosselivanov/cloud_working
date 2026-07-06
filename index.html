@@ -4,9 +4,23 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cloud Graph</title>
-  <link rel="stylesheet" href="styles.css?v=11">
+  <link rel="stylesheet" href="styles.css?v=12">
 </head>
 <body>
+  <div id="authGate" class="auth-gate">
+    <div class="auth-card">
+      <p class="auth-kicker">Cloud Working</p>
+      <h1 class="auth-title">Вход по коду</h1>
+      <p class="auth-copy">Введи персональный код, и откроется твоя сохраненная доска.</p>
+      <form id="authForm" class="auth-form">
+        <input id="authCodeInput" class="auth-input" type="password" placeholder="Код доступа" autocomplete="off" spellcheck="false">
+        <button class="auth-submit" type="submit">Открыть доску</button>
+      </form>
+      <p id="authError" class="auth-error" hidden>Код не подошел. Попробуй еще раз.</p>
+      <p class="auth-hint">Можно позже поменять список кодов прямо в `app.js`.</p>
+    </div>
+  </div>
+
   <div id="boardViewport" class="board-viewport">
     <div id="board" class="board">
       <svg id="boardEdges" class="board-edges"></svg>
@@ -19,6 +33,7 @@
     <button id="createCloudBtn" class="dock-button dock-button-primary">+ Облако</button>
     <button id="createSharedBtn" class="dock-button">+ Общая задача</button>
     <button id="centerViewBtn" class="dock-button">Центр</button>
+    <button id="logoutBtn" class="dock-button">Выйти</button>
   </div>
 
   <div id="cloudStudio" class="cloud-studio" hidden>
@@ -105,7 +120,7 @@
     </article>
   </template>
 
-  <script src="app.js?v=11"></script>
+  <script src="app.js?v=12"></script>
 </body>
 </html>
 

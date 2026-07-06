@@ -1,5 +1,6 @@
 ﻿const STORAGE_KEY = "cloud-graph-state-v8";
-const STORAGE_SCHEMA_VERSION = "v11";
+const AUTH_STORAGE_KEY = "cloud-working-auth-v1";
+const ACCESS_CODES = ["CW-2471", "BOSSE-2026", "STARCLOUD"];
 const CLOUD_WIDTH = 260;
 const CLOUD_HEIGHT = 156;
 const SHARED_WIDTH = 252;
@@ -34,6 +35,7 @@ const elements = {
   createCloudBtn: document.getElementById("createCloudBtn"),
   createSharedBtn: document.getElementById("createSharedBtn"),
   centerViewBtn: document.getElementById("centerViewBtn"),
+  logoutBtn: document.getElementById("logoutBtn"),
   studio: document.getElementById("cloudStudio"),
   studioPanel: document.querySelector(".cloud-studio-panel"),
   studioTitle: document.getElementById("studioTitle"),
@@ -43,6 +45,10 @@ const elements = {
   taskCanvas: document.getElementById("taskCanvas"),
   taskEdges: document.getElementById("taskEdges"),
   taskNodes: document.getElementById("taskNodes"),
+  authGate: document.getElementById("authGate"),
+  authForm: document.getElementById("authForm"),
+  authCodeInput: document.getElementById("authCodeInput"),
+  authError: document.getElementById("authError"),
 };
 
 let cloudDrag = null;
@@ -58,69 +64,14 @@ let spotlightTimer = null;
 bootstrap();
 
 function bootstrap() {
-  loadState();
-  if (state.clouds.length === 0) {
-    seedDemo();
-  }
   bindGlobalEvents();
-  render();
-}
-
-function seedDemo() {
-  const economicsTasks = [
-    createTask("Учебник и структура тем", 80, 70, "2026-07-06", "idea"),
-    createTask("Практика и задачи", 420, 180, "2026-07-12", "task"),
-    createTask("Конспект по слабым местам", 250, 360, "", "decision"),
-  ];
-  const booksTasks = [
-    createTask("Подобрать список чтения", 90, 90, "2026-07-05", "task"),
-    createTask("Выписать идеи", 380, 260, "", "idea"),
-  ];
-  const studyTasks = [
-    createTask("Вебинар", 100, 120, "2026-07-04", "task"),
-    createTask("План на неделю", 420, 320, "", "risk"),
-  ];
-
-  state.clouds = [
-    createCloudModel({
-      title: "Экономика",
-      x: 180,
-      y: 180,
-      tasks: economicsTasks,
-      edges: [createEdge(economicsTasks[0].id, economicsTasks[1].id), createEdge(economicsTasks[1].id, economicsTasks[2].id)],
-      blobSeed: 0.16,
-    }),
-    createCloudModel({
-      title: "Книги",
-      x: 860,
-      y: 210,
-      tasks: booksTasks,
-      edges: [createEdge(booksTasks[0].id, booksTasks[1].id)],
-      blobSeed: 0.58,
-    }),
-    createCloudModel({
-      title: "Учеба",
-      x: 380,
-      y: 640,
-      tasks: studyTasks,
-      edges: [createEdge(studyTasks[0].id, studyTasks[1].id)],
-      blobSeed: 0.82,
-    }),
-  ];
-
-  state.sharedTasks = [
-    createSharedTask({
-      text: "Собрать материалы для экономического списка чтения",
-      x: 620,
-      y: 360,
-      deadline: "2026-07-10",
-      type: "task",
-      links: [
-        { cloudId: state.clouds[0].id, taskId: economicsTasks[1].id },
-        { cloudId: state.clouds[1].id, taskId: booksTasks[0].id },
-      ],
-    }),
-  ];
+  if (isAuthorized()) {
+    unlockApp();
+    loadState();
+    render();
+  } else {
+    lockApp();
+  }
 }
 
 function createCloudModel({ title, x, y, tasks = [], edges = [], blobSeed = Math.random() }) {
@@ -135,7 +86,7 @@ function createCloudModel({ title, x, y, tasks = [], edges = [], blobSeed = Math
   };
 }
 
-function createTask(text = "Новая задача", x = 120, y = 90, deadline = "", type = "task") {
+function createTask(text = "", x = 120, y = 90, deadline = "", type = "task") {
   return {
     id: crypto.randomUUID(),
     text,
@@ -146,7 +97,7 @@ function createTask(text = "Новая задача", x = 120, y = 90, deadline 
   };
 }
 
-function createSharedTask({ text = "Общая задача", x = 420, y = 280, deadline = "", type = "task", links = [] } = {}) {
+function createSharedTask({ text = "", x = 420, y = 280, deadline = "", type = "task", links = [] } = {}) {
   return {
     id: crypto.randomUUID(),
     text,
@@ -167,6 +118,7 @@ function createEdge(from, to) {
 }
 
 function bindGlobalEvents() {
+  elements.authForm.addEventListener("submit", handleAuthSubmit);
   elements.createCloudBtn.addEventListener("click", () => {
     createCloud();
     render();
@@ -183,6 +135,7 @@ function bindGlobalEvents() {
     state.view = { x: 0, y: 0, scale: 1 };
     renderBoardTransform();
   });
+  elements.logoutBtn.addEventListener("click", logout);
 
   elements.closeStudioBtn.addEventListener("click", closeStudio);
   elements.addTaskBtn.addEventListener("click", addTaskToOpenCloud);
@@ -203,7 +156,7 @@ function createCloud(x = 240 + state.clouds.length * 52, y = 180 + state.clouds.
     title: `Облако ${nextIndex}`,
     x,
     y,
-    tasks: [createTask("Первая мысль", 120, 100, "")],
+    tasks: [],
     edges: [],
   });
   state.clouds.push(cloud);
@@ -217,7 +170,7 @@ function createSharedOnBoard() {
   };
   state.sharedTasks.push(
     createSharedTask({
-      text: "Общая задача",
+      text: "",
       x: center.x - SHARED_WIDTH / 2,
       y: center.y - SHARED_HEIGHT / 2,
       links: [],
@@ -659,13 +612,13 @@ function addTaskToOpenCloud() {
   }
 
   const offset = cloud.tasks.length * 26;
-  cloud.tasks.push(createTask("Новая задача", 90 + offset, 90 + offset, ""));
+  cloud.tasks.push(createTask("", 90 + offset, 90 + offset, ""));
   saveState();
   renderStudio();
 }
 
 function spawnChildTask(cloud, parentTask) {
-  const child = createTask("Подзадача", parentTask.x + 280, parentTask.y + 40, "", inferChildType(parentTask.type));
+  const child = createTask("", parentTask.x + 280, parentTask.y + 40, "", inferChildType(parentTask.type));
   cloud.tasks.push(child);
   cloud.edges = cloud.edges || [];
   cloud.edges.push(createEdge(parentTask.id, child.id));
@@ -1096,9 +1049,47 @@ function inferChildType(parentType = "task") {
   return "task";
 }
 
+function isAuthorized() {
+  return localStorage.getItem(AUTH_STORAGE_KEY) === "granted";
+}
+
+function lockApp() {
+  document.body.classList.add("is-auth-locked");
+  elements.authGate.hidden = false;
+  elements.authCodeInput.value = "";
+  elements.authError.hidden = true;
+}
+
+function unlockApp() {
+  document.body.classList.remove("is-auth-locked");
+  elements.authGate.hidden = true;
+  elements.authError.hidden = true;
+}
+
+function handleAuthSubmit(event) {
+  event.preventDefault();
+  const code = elements.authCodeInput.value.trim();
+  if (!ACCESS_CODES.includes(code)) {
+    elements.authError.hidden = false;
+    elements.authCodeInput.select();
+    return;
+  }
+
+  localStorage.setItem(AUTH_STORAGE_KEY, "granted");
+  unlockApp();
+  loadState();
+  render();
+}
+
+function logout() {
+  localStorage.removeItem(AUTH_STORAGE_KEY);
+  state.openCloudId = null;
+  lockApp();
+}
+
 function loadState() {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = localStorage.getItem("cloud-graph-state-v12");
     if (!saved) {
       return;
     }
@@ -1115,7 +1106,7 @@ function loadState() {
       cloud.edges = Array.isArray(cloud.edges) ? cloud.edges : [];
       cloud.tasks = (cloud.tasks || []).map((task) => ({
         id: task.id || crypto.randomUUID(),
-        text: task.text || task.title || "Новая задача",
+        text: task.text || task.title || "",
         x: typeof task.x === "number" ? task.x : 120,
         y: typeof task.y === "number" ? task.y : 100,
         deadline: task.deadline || "",
@@ -1125,7 +1116,7 @@ function loadState() {
 
     state.sharedTasks = state.sharedTasks.map((task) => ({
       id: task.id || crypto.randomUUID(),
-      text: task.text || "Общая задача",
+      text: task.text || "",
       x: typeof task.x === "number" ? task.x : 420,
       y: typeof task.y === "number" ? task.y : 280,
       deadline: task.deadline || "",
@@ -1139,7 +1130,7 @@ function loadState() {
 
 function saveState() {
   localStorage.setItem(
-    STORAGE_KEY,
+    "cloud-graph-state-v12",
     JSON.stringify({
       view: state.view,
       clouds: state.clouds,
