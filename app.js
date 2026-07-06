@@ -177,6 +177,9 @@ function createSharedOnBoard() {
       links: [],
     })
   );
+  saveState();
+  renderSharedTasks();
+  renderBoardEdges();
 }
 
 function render() {
@@ -656,7 +659,9 @@ function addTaskToOpenCloud() {
   const task = createTask("", 90 + offset, 90 + offset, "");
   cloud.tasks.push(task);
   saveState();
-  render();
+  renderStudio();
+  renderClouds();
+  renderBoardEdges();
   focusTaskEditor(task.id);
 }
 
@@ -666,7 +671,9 @@ function spawnChildTask(cloud, parentTask) {
   cloud.edges = cloud.edges || [];
   cloud.edges.push(createEdge(parentTask.id, child.id));
   saveState();
-  render();
+  renderStudio();
+  renderClouds();
+  renderBoardEdges();
   focusTaskEditor(child.id);
 }
 
@@ -1114,7 +1121,9 @@ function focusTaskEditor(taskId) {
       return;
     }
     node.focus();
-    node.setSelectionRange(0, node.value.length);
+    if (typeof node.setSelectionRange === "function") {
+      node.setSelectionRange(0, node.value.length);
+    }
   });
 }
 
