@@ -743,6 +743,11 @@ body.has-open-cloud .floating-dock {
   font-size: 1rem;
 }
 
+.task-text::placeholder,
+.shared-text::placeholder {
+  color: rgba(22, 22, 22, 0.34);
+}
+
 .task-footer {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
