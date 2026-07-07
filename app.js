@@ -1,4 +1,5 @@
 ﻿const STORAGE_KEY = "cloud-graph-state-v8";
+const STORAGE_PERSISTENCE_KEY = "cloud-graph-state-v12";
 const AUTH_STORAGE_KEY = "cloud-working-auth-v1";
 const ACCESS_CODES = ["CW-2471", "BOSSE-2026", "STARCLOUD"];
 const CLOUD_WIDTH = 260;
@@ -966,10 +967,6 @@ function screenToWorld(clientX, clientY) {
   };
 }
 
-function getCloudRelations(cloudId) {
-  return [];
-}
-
 function getSharedRelations(sharedId) {
   const sharedTask = state.sharedTasks.find((item) => item.id === sharedId);
   if (!sharedTask) {
@@ -1226,7 +1223,7 @@ function logout() {
 
 function loadState() {
   try {
-    const saved = localStorage.getItem("cloud-graph-state-v12");
+    const saved = localStorage.getItem(STORAGE_PERSISTENCE_KEY);
     if (!saved) {
       return;
     }
@@ -1267,7 +1264,7 @@ function loadState() {
 
 function saveState() {
   localStorage.setItem(
-    "cloud-graph-state-v12",
+    STORAGE_PERSISTENCE_KEY,
     JSON.stringify({
       view: state.view,
       clouds: state.clouds,

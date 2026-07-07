@@ -34,6 +34,10 @@ body {
   overflow: hidden;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body.is-auth-locked .floating-dock,
 body.is-auth-locked .cloud-studio,
 body.is-auth-locked .board-viewport {
