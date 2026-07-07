@@ -42,7 +42,6 @@ const elements = {
   studioTitle: document.getElementById("studioTitle"),
   closeStudioBtn: document.getElementById("closeStudioBtn"),
   addTaskBtn: document.getElementById("addTaskBtn"),
-  sharedRail: document.getElementById("sharedRail"),
   taskCanvas: document.getElementById("taskCanvas"),
   taskEdges: document.getElementById("taskEdges"),
   taskNodes: document.getElementById("taskNodes"),
@@ -282,13 +281,11 @@ function renderSharedTasks() {
     node.querySelector(".shared-text").addEventListener("input", (event) => {
       sharedTask.text = event.target.value;
       saveState();
-      syncStudioSharedRail();
     });
 
     node.querySelector(".shared-deadline-input").addEventListener("input", (event) => {
       sharedTask.deadline = event.target.value;
       saveState();
-      syncStudioSharedRail();
     });
 
     node.querySelector(".shared-type-cycle-btn").addEventListener("click", () => {
@@ -494,8 +491,6 @@ function renderStudio() {
   const cloud = getOpenCloud();
   if (!cloud) {
     elements.studio.hidden = true;
-    elements.sharedRail.hidden = true;
-    elements.sharedRail.innerHTML = "";
     elements.taskEdges.innerHTML = "";
     elements.taskNodes.innerHTML = "";
     return;
@@ -568,32 +563,6 @@ function renderStudio() {
   }
 
   renderTaskEdges(cloud);
-  renderSharedRail(cloud);
-}
-
-function renderSharedRail(cloud) {
-  const related = state.sharedTasks.filter((sharedTask) => (sharedTask.links || []).some((link) => link.cloudId === cloud.id));
-  elements.sharedRail.innerHTML = "";
-  elements.sharedRail.hidden = related.length === 0;
-  if (related.length === 0) {
-    return;
-  }
-
-  for (const sharedTask of related) {
-    const pill = document.createElement("button");
-    pill.type = "button";
-    pill.className = `shared-rail-chip shared-rail-chip--${sharedTask.type || "task"}`;
-    pill.textContent = `${sharedTask.text} · ${Math.max(1, (sharedTask.links || []).length)} связ.`;
-    pill.addEventListener("click", () => focusSharedTask(sharedTask.id));
-    elements.sharedRail.append(pill);
-  }
-}
-
-function syncStudioSharedRail() {
-  const cloud = getOpenCloud();
-  if (cloud) {
-    renderSharedRail(cloud);
-  }
 }
 
 function renderTaskEdges(cloud) {
@@ -721,19 +690,7 @@ function toggleSharedTaskLink(sharedId, cloudId, taskId) {
 }
 
 function collectTaskChainLinks(cloud, taskId) {
-  const edges = cloud.edges || [];
-  const links = [{ cloudId: cloud.id, taskId }];
-
-  for (const edge of edges) {
-    if (edge.from === taskId) {
-      links.push({ cloudId: cloud.id, taskId: edge.to });
-    }
-    if (edge.to === taskId) {
-      links.push({ cloudId: cloud.id, taskId: edge.from });
-    }
-  }
-
-  return dedupeLinks(links);
+  return [{ cloudId: cloud.id, taskId }];
 }
 
 function removeCloud(cloudId) {
