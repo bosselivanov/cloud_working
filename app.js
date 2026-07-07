@@ -722,26 +722,14 @@ function toggleSharedTaskLink(sharedId, cloudId, taskId) {
 
 function collectTaskChainLinks(cloud, taskId) {
   const edges = cloud.edges || [];
-  const visited = new Set();
-  const stack = [taskId];
-  const links = [];
+  const links = [{ cloudId: cloud.id, taskId }];
 
-  while (stack.length > 0) {
-    const currentTaskId = stack.pop();
-    if (!currentTaskId || visited.has(currentTaskId)) {
-      continue;
+  for (const edge of edges) {
+    if (edge.from === taskId) {
+      links.push({ cloudId: cloud.id, taskId: edge.to });
     }
-
-    visited.add(currentTaskId);
-    links.push({ cloudId: cloud.id, taskId: currentTaskId });
-
-    for (const edge of edges) {
-      if (edge.from === currentTaskId && !visited.has(edge.to)) {
-        stack.push(edge.to);
-      }
-      if (edge.to === currentTaskId && !visited.has(edge.from)) {
-        stack.push(edge.from);
-      }
+    if (edge.to === taskId) {
+      links.push({ cloudId: cloud.id, taskId: edge.from });
     }
   }
 
