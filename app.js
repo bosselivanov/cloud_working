@@ -695,7 +695,7 @@ function convertTaskToShared(cloud, taskId) {
     y: sharedPosition.y,
     deadline: task.deadline,
     type: task.type,
-    links: [{ cloudId: cloud.id, taskId: task.id }],
+    links: collectTaskChainLinks(cloud, task.id),
   });
 
   state.sharedTasks.push(sharedTask);
@@ -718,6 +718,34 @@ function toggleSharedTaskLink(sharedId, cloudId, taskId) {
   }
   saveState();
   render();
+}
+
+function collectTaskChainLinks(cloud, taskId) {
+  const edges = cloud.edges || [];
+  const visited = new Set();
+  const stack = [taskId];
+  const links = [];
+
+  while (stack.length > 0) {
+    const currentTaskId = stack.pop();
+    if (!currentTaskId || visited.has(currentTaskId)) {
+      continue;
+    }
+
+    visited.add(currentTaskId);
+    links.push({ cloudId: cloud.id, taskId: currentTaskId });
+
+    for (const edge of edges) {
+      if (edge.from === currentTaskId && !visited.has(edge.to)) {
+        stack.push(edge.to);
+      }
+      if (edge.to === currentTaskId && !visited.has(edge.from)) {
+        stack.push(edge.from);
+      }
+    }
+  }
+
+  return dedupeLinks(links);
 }
 
 function removeCloud(cloudId) {
