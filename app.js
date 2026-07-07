@@ -653,6 +653,18 @@ function convertTaskToShared(cloud, taskId) {
     return;
   }
 
+  const existingSharedTask = state.sharedTasks.find((sharedTask) =>
+    (sharedTask.links || []).some((link) => link.cloudId === cloud.id && link.taskId === task.id)
+  );
+  if (existingSharedTask) {
+    existingSharedTask.text = task.text;
+    existingSharedTask.deadline = task.deadline;
+    existingSharedTask.type = task.type;
+    saveState();
+    focusSharedTask(existingSharedTask.id);
+    return;
+  }
+
   const sharedPosition = {
     x: cloud.x + CLOUD_WIDTH + 90 + state.sharedTasks.length * 18,
     y: cloud.y + 24 + state.sharedTasks.length * 18,
@@ -669,7 +681,7 @@ function convertTaskToShared(cloud, taskId) {
 
   state.sharedTasks.push(sharedTask);
   saveState();
-  render();
+  focusSharedTask(sharedTask.id);
 }
 
 function toggleSharedTaskLink(sharedId, cloudId, taskId) {
