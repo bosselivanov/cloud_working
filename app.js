@@ -8,6 +8,11 @@ const SHARED_WIDTH = 252;
 const SHARED_HEIGHT = 176;
 const TASK_WIDTH = 284;
 const TASK_HEIGHT = 182;
+const CLOUD_PREVIEW_WIDTH = 560;
+const CLOUD_PREVIEW_HEIGHT = 320;
+const CLOUD_PREVIEW_TASK_WIDTH = 184;
+const CLOUD_PREVIEW_TASK_HEIGHT = 92;
+const CLOUD_PREVIEW_PADDING = 26;
 
 const state = {
   view: { x: 0, y: 0, scale: 1 },
@@ -323,18 +328,33 @@ function renderCloudPreview(container, cloud) {
   if (cloud.tasks.length === 0) {
     return;
   }
-  const previewWidth = 460;
-  const previewHeight = 300;
+  const previewLayout = getCloudPreviewLayout(cloud);
+  const previewTasks = [...cloud.tasks].sort((leftTask, rightTask) => {
+    const leftLinked = Number(isTaskLinkedToWorld(cloud.id, leftTask.id));
+    const rightLinked = Number(isTaskLinkedToWorld(cloud.id, rightTask.id));
+    if (leftLinked !== rightLinked) {
+      return leftLinked - rightLinked;
+    }
+    if (leftTask.y !== rightTask.y) {
+      return leftTask.y - rightTask.y;
+    }
+    return leftTask.x - rightTask.x;
+  });
 
-  for (const task of cloud.tasks) {
+  for (const task of previewTasks) {
+    const layout = previewLayout.get(task.id) || {
+      left: CLOUD_PREVIEW_PADDING,
+      top: CLOUD_PREVIEW_PADDING,
+    };
     const preview = document.createElement("div");
     preview.className = "cloud-preview-task";
     preview.dataset.taskId = task.id;
     preview.dataset.cloudId = cloud.id;
     preview.dataset.taskType = task.type || "task";
     preview.classList.toggle("is-linked", isTaskLinkedToWorld(cloud.id, task.id));
-    preview.style.left = `${clamp(24 + task.x * 0.42, 18, previewWidth - 190)}px`;
-    preview.style.top = `${clamp(22 + task.y * 0.34, 18, previewHeight - 78)}px`;
+    preview.style.zIndex = isTaskLinkedToWorld(cloud.id, task.id) ? "3" : "1";
+    preview.style.left = `${layout.left}px`;
+    preview.style.top = `${layout.top}px`;
 
     const label = document.createElement("span");
     label.className = "cloud-preview-label";
@@ -963,19 +983,55 @@ function getSharedRelations(sharedId) {
     .map((link) => {
       const cloud = state.clouds.find((item) => item.id === link.cloudId);
       const task = cloud?.tasks.find((item) => item.id === link.taskId);
+      const previewLayout = cloud ? getCloudPreviewLayout(cloud).get(link.taskId) : null;
       if (!cloud || !task) {
         return null;
       }
       return {
         relationId: makeRelationId(sharedId, link.cloudId, link.taskId),
         side: cloud.x + CLOUD_WIDTH * 0.5 < centerX ? "left" : "right",
-        sortY: cloud.y + task.y * 0.32,
+        sortY: cloud.y + (previewLayout?.top || CLOUD_PREVIEW_PADDING),
         type: sharedTask.type || "task",
       };
     })
     .filter(Boolean);
 
   return sortRelations(relations);
+}
+
+function getCloudPreviewLayout(cloud) {
+  const tasks = cloud.tasks || [];
+  const layout = new Map();
+  if (tasks.length === 0) {
+    return layout;
+  }
+
+  const minX = Math.min(...tasks.map((task) => task.x));
+  const maxX = Math.max(...tasks.map((task) => task.x));
+  const minY = Math.min(...tasks.map((task) => task.y));
+  const maxY = Math.max(...tasks.map((task) => task.y));
+  const spanX = Math.max(1, maxX - minX);
+  const spanY = Math.max(1, maxY - minY);
+  const usableWidth = Math.max(1, CLOUD_PREVIEW_WIDTH - CLOUD_PREVIEW_TASK_WIDTH - CLOUD_PREVIEW_PADDING * 2);
+  const usableHeight = Math.max(1, CLOUD_PREVIEW_HEIGHT - CLOUD_PREVIEW_TASK_HEIGHT - CLOUD_PREVIEW_PADDING * 2);
+  const scale = Math.min(1, usableWidth / spanX, usableHeight / spanY);
+
+  for (const task of tasks) {
+    layout.set(task.id, {
+      left: clamp(
+        CLOUD_PREVIEW_PADDING + (task.x - minX) * scale,
+        CLOUD_PREVIEW_PADDING,
+        CLOUD_PREVIEW_WIDTH - CLOUD_PREVIEW_TASK_WIDTH - CLOUD_PREVIEW_PADDING
+      ),
+      top: clamp(
+        CLOUD_PREVIEW_PADDING + (task.y - minY) * scale,
+        CLOUD_PREVIEW_PADDING,
+        CLOUD_PREVIEW_HEIGHT - CLOUD_PREVIEW_TASK_HEIGHT - CLOUD_PREVIEW_PADDING
+      ),
+    });
+  }
+
+  return layout;
 }
 
 function sortRelations(relations) {
@@ -1069,12 +1125,14 @@ function getTaskWorldRelations(cloudId, taskId) {
   if (!cloud || !task) {
     return [];
   }
+  const previewLayout = getCloudPreviewLayout(cloud).get(taskId);
+  const previewAnchorX = cloud.x + (previewLayout?.left || CLOUD_PREVIEW_PADDING) + CLOUD_PREVIEW_TASK_WIDTH * 0.5;
 
   return state.sharedTasks
     .filter((sharedTask) => hasSharedTaskLink(sharedTask, cloudId, taskId))
     .map((sharedTask) => ({
       relationId: makeRelationId(sharedTask.id, cloudId, taskId),
-      side: sharedTask.x + SHARED_WIDTH * 0.5 < cloud.x + task.x ? "left" : "right",
+      side: sharedTask.x + SHARED_WIDTH * 0.5 < previewAnchorX ? "left" : "right",
       type: sharedTask.type || "task",
     }));
 }
