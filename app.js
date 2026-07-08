@@ -2,8 +2,8 @@
 const STORAGE_PERSISTENCE_KEY = "cloud-graph-state-v12";
 const AUTH_STORAGE_KEY = "cloud-working-auth-v1";
 const ACCESS_CODES = ["CW-2471", "BOSSE-2026", "STARCLOUD"];
-const CLOUD_WIDTH = 260;
-const CLOUD_HEIGHT = 156;
+const CLOUD_WIDTH = 560;
+const CLOUD_HEIGHT = 360;
 const SHARED_WIDTH = 252;
 const SHARED_HEIGHT = 176;
 const TASK_WIDTH = 284;
@@ -323,8 +323,8 @@ function renderCloudPreview(container, cloud) {
   if (cloud.tasks.length === 0) {
     return;
   }
-  const previewWidth = 300;
-  const previewHeight = 160;
+  const previewWidth = 460;
+  const previewHeight = 300;
 
   for (const task of cloud.tasks) {
     const preview = document.createElement("div");
@@ -333,8 +333,8 @@ function renderCloudPreview(container, cloud) {
     preview.dataset.cloudId = cloud.id;
     preview.dataset.taskType = task.type || "task";
     preview.classList.toggle("is-linked", isTaskLinkedToWorld(cloud.id, task.id));
-    preview.style.left = `${clamp(16 + task.x * 0.28, 12, previewWidth - 140)}px`;
-    preview.style.top = `${clamp(14 + task.y * 0.2, 12, previewHeight - 58)}px`;
+    preview.style.left = `${clamp(24 + task.x * 0.42, 18, previewWidth - 190)}px`;
+    preview.style.top = `${clamp(22 + task.y * 0.34, 18, previewHeight - 78)}px`;
 
     const label = document.createElement("span");
     label.className = "cloud-preview-label";
@@ -969,7 +969,7 @@ function getSharedRelations(sharedId) {
       return {
         relationId: makeRelationId(sharedId, link.cloudId, link.taskId),
         side: cloud.x + CLOUD_WIDTH * 0.5 < centerX ? "left" : "right",
-        sortY: cloud.y + task.y * 0.14,
+        sortY: cloud.y + task.y * 0.32,
         type: sharedTask.type || "task",
       };
     })
